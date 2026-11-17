@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 const JABATAN_OPTIONS = ['Sekretaris', 'Bendahara', 'Dokumentasi', 'Humas'];
+const PRODI_OPTIONS = ['Sistem Komputer', 'Teknik Informatika', 'Sistem Informasi'];
 const BULAN_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 const BULAN_ROMAWI = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 
@@ -43,7 +44,7 @@ function slug(s) {
 export default function Page() {
   const [nama, setNama] = useState('');
   const [nim, setNim] = useState('');
-  const [prodi, setProdi] = useState('Ilmu Komputer');
+  const [prodi, setProdi] = useState('Sistem Komputer');
   const [jabatan, setJabatan] = useState('Sekretaris');
   const [tandaTangan, setTandaTangan] = useState('digital'); // 'digital' | 'basah'
   const [submitted, setSubmitted] = useState(null); // { tanggal: string, nomor: string }
@@ -71,7 +72,7 @@ export default function Page() {
   function pilihSaran(r) {
     setNama(r.nama);
     setNim(r.nim || '');
-    setProdi(r.prodi || 'Ilmu Komputer');
+    setProdi(r.prodi || 'Sistem Komputer');
     if (r.jabatan && JABATAN_OPTIONS.includes(r.jabatan)) setJabatan(r.jabatan);
     setShowSaran(false);
   }
@@ -101,7 +102,7 @@ export default function Page() {
   function handleReset() {
     setNama('');
     setNim('');
-    setProdi('Ilmu Komputer');
+    setProdi('Sistem Komputer');
     setJabatan('Sekretaris');
     setSubmitted(null);
   }
@@ -340,8 +341,10 @@ export default function Page() {
               </div>
               <div className="field">
                 <label htmlFor="prodi">Program Studi</label>
-                <input id="prodi" type="text" value={prodi} onChange={(e) => setProdi(e.target.value)} placeholder="Ilmu Komputer" />
-                <div className="help">Bawaan: Ilmu Komputer. Ubah bila perlu.</div>
+                <select id="prodi" value={prodi} onChange={(e) => setProdi(e.target.value)}>
+                  {PRODI_OPTIONS.map((p) => (<option key={p} value={p}>{p}</option>))}
+                  {!PRODI_OPTIONS.includes(prodi) && prodi.trim() !== '' && (<option value={prodi}>{prodi}</option>)}
+                </select>
               </div>
               <div className="field">
                 <label htmlFor="jabatan">Jabatan</label>
@@ -355,7 +358,7 @@ export default function Page() {
                 <div className="radio-group" role="radiogroup" aria-label="Tanda tangan">
                   <label className="radio">
                     <input type="radio" name="tandaTangan" value="digital" checked={tandaTangan === 'digital'} onChange={() => setTandaTangan('digital')} />
-                    <span><b>Tanda tangan digital</b><br />Tanda tangan yang bersangkutan (Ketua HIMA ILKOM) ditempel di surat (file PNG).</span>
+                    <span><b>Tanda tangan digital</b><br />Tanda tangan yang bersangkutan (Ketua HIMA ILKOM) ditempel di surat.</span>
                   </label>
                   <label className="radio">
                     <input type="radio" name="tandaTangan" value="basah" checked={tandaTangan === 'basah'} onChange={() => setTandaTangan('basah')} />
