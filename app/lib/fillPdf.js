@@ -39,7 +39,7 @@ function wrapText(text, font, maxWidth) {
   return lines;
 }
 
-export async function fillSuratPdf({ templateBytes, nama, nim, prodi, jabatan, tanggalTampil, nomorTampil }) {
+export async function fillSuratPdf({ templateBytes, nama, nim, prodi, jabatan, tanggalTampil, nomorTampil, tandaTangan = 'basah', signatureBytes = null }) {
   const src = await PDFDocument.load(templateBytes);
   const out = await PDFDocument.create();
   const font = await out.embedFont(StandardFonts.TimesRoman);
@@ -94,6 +94,22 @@ export async function fillSuratPdf({ templateBytes, nama, nim, prodi, jabatan, t
   // 6. Blok tanda tangan, geser 1 baris
   textRight('Ketua HIMA ILKOM', 540.31, 551.41 + ROW);
   textRight('Universitas Narotama Surabaya', 540.45, 567.25 + ROW);
+  // Tanda tangan digital: tempel PNG di celah antara "Universitas..." dan
+  // nama (baseline nama ~666, baseline "Universitas..." ~589 — ruang ~77pt).
+  if (tandaTangan === 'digital' && signatureBytes) {
+    try {
+      const sig = await out.embedPng(signatureBytes);
+      const SIG_H = 58; // tinggi gambar (pt template)
+      const SIG_W = SIG_H * (sig.width / sig.height);
+      const SIG_TOP = 594; // tepi atas gambar (koordinat dari-atas template)
+      page.drawImage(sig, {
+        x: X(540 - SIG_W),
+        y: Y(SIG_TOP + SIG_H),
+        width: SIG_W * S,
+        height: SIG_H * S,
+      });
+    } catch { /* tanpa tanda tangan bila PNG gagal dimuat */ }
+  }
   textRight('Hendryk Damastra', 540.12, 644.55 + ROW, fontBold);
   textRight('NIM : 04123008', 540.67, 670.23 + ROW);
 
