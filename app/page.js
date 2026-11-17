@@ -355,7 +355,7 @@ export default function Page() {
                 <div className="radio-group" role="radiogroup" aria-label="Tanda tangan">
                   <label className="radio">
                     <input type="radio" name="tandaTangan" value="digital" checked={tandaTangan === 'digital'} onChange={() => setTandaTangan('digital')} />
-                    <span><b>Tanda tangan digital</b><br />Tanda tangan Hendryk ditempel di surat (file PNG).</span>
+                    <span><b>Tanda tangan digital</b><br />Tanda tangan yang bersangkutan (Ketua HIMA ILKOM) ditempel di surat (file PNG).</span>
                   </label>
                   <label className="radio">
                     <input type="radio" name="tandaTangan" value="basah" checked={tandaTangan === 'basah'} onChange={() => setTandaTangan('basah')} />
