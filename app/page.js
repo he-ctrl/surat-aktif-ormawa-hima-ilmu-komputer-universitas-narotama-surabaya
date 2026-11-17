@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const JABATAN_OPTIONS = ['Sekretaris', 'Bendahara', 'Dokumentasi', 'Humas'];
 const BULAN_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -27,7 +27,33 @@ export default function Page() {
   const [jabatan, setJabatan] = useState('Sekretaris');
   const [submitted, setSubmitted] = useState(null); // { tanggal: string, nomor: string }
   const [busy, setBusy] = useState('');
+  const [records, setRecords] = useState([]); // nama yang pernah dibuat (dari database)
+  const [showSaran, setShowSaran] = useState(false);
   const letterRef = useRef(null);
+
+  // Ambil daftar nama yang sudah pernah dibuat dari database.
+  useEffect(() => {
+    fetch('/api/names')
+      .then((r) => r.json())
+      .then((d) => { if (Array.isArray(d.records)) setRecords(d.records); })
+      .catch(() => {});
+  }, []);
+
+  // Saran nama yang cocok dengan ketikan (maks. 6).
+  const saran = records.filter((r) => {
+    const q = nama.trim().toLowerCase();
+    if (!q) return false;
+    return r.nama.toLowerCase().includes(q) && r.nama.toLowerCase() !== q;
+  }).slice(0, 6);
+
+  // Pilih saran: isi otomatis NIM, prodi, dan jabatan.
+  function pilihSaran(r) {
+    setNama(r.nama);
+    setNim(r.nim || '');
+    setProdi(r.prodi || 'Ilmu Komputer');
+    if (r.jabatan && JABATAN_OPTIONS.includes(r.jabatan)) setJabatan(r.jabatan);
+    setShowSaran(false);
+  }
 
   const now = new Date();
   const tanggalTampil = submitted ? submitted.tanggal : formatTanggal(now);
@@ -39,6 +65,15 @@ export default function Page() {
     if (!bisaSubmit) return;
     const d = new Date();
     setSubmitted({ tanggal: formatTanggal(d), nomor: formatNomor(d) });
+    // Simpan nama ke database supaya muncul sebagai saran berikutnya.
+    fetch('/api/names', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nama: nama.trim(), nim: nim.trim(), prodi: prodi.trim(), jabatan }),
+    })
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data.records)) setRecords(data.records); })
+      .catch(() => {});
     setTimeout(() => letterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }
 
@@ -162,7 +197,26 @@ export default function Page() {
             <form onSubmit={handleSubmit}>
               <div className="field">
                 <label htmlFor="nama">Nama <span>*</span></label>
-                <input id="nama" type="text" value={nama} onChange={(e) => setNama(e.target.value)} placeholder="Nama lengkap" required />
+                <div className="saran-wrap">
+                  <input id="nama" type="text" value={nama} autoComplete="off"
+                    onChange={(e) => { setNama(e.target.value); setShowSaran(true); }}
+                    onFocus={() => setShowSaran(true)}
+                    onBlur={() => setTimeout(() => setShowSaran(false), 150)}
+                    placeholder="Nama lengkap" required />
+                  {showSaran && saran.length > 0 && (
+                    <ul className="saran-list">
+                      {saran.map((r) => (
+                        <li key={r.nama}>
+                          <button type="button" onMouseDown={(ev) => { ev.preventDefault(); pilihSaran(r); }}>
+                            <b>{r.nama}</b>
+                            <span>{[r.nim, r.jabatan].filter(Boolean).join(' • ')}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="help">Ketik nama — bila pernah dibuat sebelumnya, pilih dari saran dan NIM, prodi, serta jabatan terisi otomatis.</div>
               </div>
               <div className="field">
                 <label htmlFor="nim">NIM <span>*</span></label>
@@ -189,6 +243,18 @@ export default function Page() {
               Hendryk Damastra — NIM 04123008<br />
               Ketua Himpunan Mahasiswa Ilmu Komputer
             </div>
+
+            {records.length > 0 && (
+              <div className="history">
+                <b>Nama yang sudah pernah dibuat:</b>
+                <div className="chips">
+                  {records.map((r) => (
+                    <button key={r.nama} type="button" className="chip" onClick={() => pilihSaran(r)} title={`${r.nama}${r.nim ? ' — ' + r.nim : ''}${r.jabatan ? ' — ' + r.jabatan : ''}`}>{r.nama}</button>
+                  ))}
+                </div>
+                <div className="help">Ketuk nama untuk mengisi otomatis NIM, prodi, dan jabatan.</div>
+              </div>
+            )}
           </section>
 
           <section className="letter-wrap">
