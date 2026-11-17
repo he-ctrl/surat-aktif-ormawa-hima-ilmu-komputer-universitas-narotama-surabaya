@@ -82,6 +82,12 @@ export default function Page() {
   const nomorTampil = submitted ? submitted.nomor : formatNomor(now);
   const bisaSubmit = nama.trim() !== '' && nim.trim() !== '';
 
+  // WhatsApp Ketua (untuk minta tanda tangan basah). Pesan dibuat dari nama
+  // dan prodi di form, tapi TIDAK ditampilkan di halaman — hanya di link.
+  const WA_KETUA = '62881026893759';
+  const waPesan = `halo mas hendryk, saya ${nama.trim()} dari prodi ${prodi.trim()}, ijin minta tanda tangan surat aktif anggota ormawa hima ilmu komputer`;
+  const waHref = `https://wa.me/${WA_KETUA}?text=${encodeURIComponent(waPesan)}`;
+
   function handleSubmit(e) {
     e.preventDefault();
     if (!bisaSubmit) return;
@@ -365,6 +371,14 @@ export default function Page() {
                     <span><b>Tanda tangan basah</b><br />Dikosongkan — ditandatangani langsung bertemu yang bersangkutan.</span>
                   </label>
                 </div>
+                {tandaTangan === 'basah' && (
+                  <div className="wa-row">
+                    <a className="btn btn-outline wa-btn" href={nama.trim() ? waHref : undefined} target="_blank" rel="noopener noreferrer" aria-disabled={nama.trim() === ''} onClick={(e) => { if (!nama.trim()) e.preventDefault(); }}>
+                      Minta tanda tangan via WhatsApp
+                    </a>
+                    {nama.trim() === '' && (<div className="help">Isi nama di atas dulu untuk mengirim.</div>)}
+                  </div>
+                )}
               </div>
               <button className="btn btn-primary" type="submit" disabled={!bisaSubmit}>Buat Surat</button>
               {submitted && (<button className="btn-ghost" type="button" onClick={handleReset}>Buat surat baru (reset)</button>)}
