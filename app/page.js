@@ -45,6 +45,7 @@ export default function Page() {
   const [nim, setNim] = useState('');
   const [prodi, setProdi] = useState('Ilmu Komputer');
   const [jabatan, setJabatan] = useState('Sekretaris');
+  const [tandaTangan, setTandaTangan] = useState('digital'); // 'digital' | 'basah'
   const [submitted, setSubmitted] = useState(null); // { tanggal: string, nomor: string }
   const [busy, setBusy] = useState('');
   const [records, setRecords] = useState([]); // nama yang pernah dibuat (dari database)
@@ -118,6 +119,13 @@ export default function Page() {
       const res = await fetch(assetPath('/surat-template.pdf'));
       if (!res.ok) throw new Error('template tidak ditemukan');
       const templateBytes = await res.arrayBuffer();
+      let signatureBytes = null;
+      if (tandaTangan === 'digital') {
+        try {
+          const sigRes = await fetch(assetPath('/tanda-tangan-hendryk.png'));
+          if (sigRes.ok) signatureBytes = await sigRes.arrayBuffer();
+        } catch { /* tanpa tanda tangan bila PNG gagal dimuat */ }
+      }
       const bytes = await fillSuratPdf({
         templateBytes,
         nama: nama.trim(),
@@ -126,6 +134,8 @@ export default function Page() {
         jabatan,
         tanggalTampil,
         nomorTampil,
+        tandaTangan,
+        signatureBytes,
       });
       const blob = new Blob([bytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
@@ -163,6 +173,13 @@ export default function Page() {
       const { fillSuratDocx } = await import('./lib/fillDocx.js');
       const res = await fetch(assetPath('/surat-template.docx'));
       if (!res.ok) throw new Error('template tidak ditemukan');
+      let signatureBytes = null;
+      if (tandaTangan === 'digital') {
+        try {
+          const sigRes = await fetch(assetPath('/tanda-tangan-hendryk.png'));
+          if (sigRes.ok) signatureBytes = await sigRes.arrayBuffer();
+        } catch { /* tanpa tanda tangan bila PNG gagal dimuat */ }
+      }
       const blob = await fillSuratDocx({
         templateBytes: await res.arrayBuffer(),
         nama: nama.trim(),
@@ -171,6 +188,8 @@ export default function Page() {
         jabatan,
         tanggalTampil,
         nomorTampil,
+        tandaTangan,
+        signatureBytes,
       });
       downloadBlob(blob, `Surat-Aktif-Ormawa-${slug(nama)}.docx`);
       return;
@@ -331,6 +350,19 @@ export default function Page() {
                 </select>
                 <div className="help">Jabatan ini muncul di bagian &ldquo;Menyatakan dengan sesungguhnya bahwa&rdquo; dan di kalimat pernyataan surat.</div>
               </div>
+              <div className="field">
+                <label>Tanda tangan</label>
+                <div className="radio-group" role="radiogroup" aria-label="Tanda tangan">
+                  <label className="radio">
+                    <input type="radio" name="tandaTangan" value="digital" checked={tandaTangan === 'digital'} onChange={() => setTandaTangan('digital')} />
+                    <span><b>Tanda tangan digital</b><br />Tanda tangan Hendryk ditempel di surat (file PNG).</span>
+                  </label>
+                  <label className="radio">
+                    <input type="radio" name="tandaTangan" value="basah" checked={tandaTangan === 'basah'} onChange={() => setTandaTangan('basah')} />
+                    <span><b>Tanda tangan basah</b><br />Dikosongkan — ditandatangani langsung bertemu yang bersangkutan.</span>
+                  </label>
+                </div>
+              </div>
               <button className="btn btn-primary" type="submit" disabled={!bisaSubmit}>Buat Surat</button>
               {submitted && (<button className="btn-ghost" type="button" onClick={handleReset}>Buat surat baru (reset)</button>)}
             </form>
@@ -401,6 +433,7 @@ export default function Page() {
               <div className="sign">
                 <div>Ketua HIMA ILKOM</div>
                 <div>Universitas Narotama Surabaya</div>
+                {tandaTangan === 'digital' && (<img className="sign-img" src={`${ASSET_BASE}/tanda-tangan-hendryk.png`} alt="Tanda tangan Hendryk Damastra" />)}
                 <div className="name">Hendryk Damastra</div>
                 <div>NIM : 04123008</div>
               </div>

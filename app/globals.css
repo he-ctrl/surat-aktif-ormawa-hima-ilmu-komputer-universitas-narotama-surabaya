@@ -17,10 +17,17 @@ button, input, select { font: inherit; }
 .panel .hint { color: #64748b; font-size: 13px; line-height: 1.5; margin: 0 0 16px; }
 .field { margin-bottom: 14px; }
 .field label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 6px; }
-.field label span { color: #dc2626; }
+.field > label > span { color: #dc2626; } /* hanya bintang wajib di label field, bukan teks opsi radio */
 .field input, .field select { width: 100%; padding: 11px 12px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; color: #0f172a; }
 .field input:focus, .field select:focus { outline: 2px solid #1d5bfb; border-color: #1d5bfb; }
 .field .help { font-size: 12px; color: #64748b; margin-top: 5px; line-height: 1.4; }
+
+.radio-group { display: flex; flex-direction: column; gap: 8px; }
+.radio { display: flex; gap: 10px; align-items: flex-start; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 12px; cursor: pointer; font-weight: 400; }
+.radio input { margin-top: 3px; accent-color: #1d5bfb; width: 16px; height: 16px; flex: none; }
+.radio span { font-size: 13px; line-height: 1.45; color: #475569; }
+.radio span b { color: #0f172a; }
+.radio:has(input:checked) { border-color: #1d5bfb; background: #eaf1ff; }
 
 .btn { display: inline-block; border: none; border-radius: 999px; padding: 12px 20px; font-weight: 700; cursor: pointer; text-decoration: none; text-align: center; }
 .btn-primary { background: #f58000; color: #fff; width: 100%; }
@@ -79,6 +86,8 @@ button, input, select { font: inherit; }
 .idtable td.sep { width: 14px; }
 .sign { margin-top: 28px; text-align: right; }
 .sign .name { font-weight: 700; margin-top: 64px; }
+.sign-img { height: 64px; width: auto; margin: 8px 0 0; }
+.sign .sign-img + .name { margin-top: 4px; }
 .placeholder { color: #94a3b8; }
 
 .saran-wrap { position: relative; }
