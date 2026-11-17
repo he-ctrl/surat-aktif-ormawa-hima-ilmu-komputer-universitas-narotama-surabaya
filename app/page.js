@@ -278,8 +278,11 @@ export default function Page() {
     <>
       <header className="topbar">
         <div className="topbar-inner">
-          <h1>Surat Keterangan Aktif Organisasi</h1>
-          <p>Himpunan Mahasiswa Ilmu Komputer (HIMA ILKOM) — Universitas Narotama Surabaya</p>
+          <img className="topbar-logo" src={`${ASSET_BASE}/logo-himailkom.png`} alt="Logo HIMA ILKOM" />
+          <div>
+            <h1>Surat Keterangan Aktif Organisasi</h1>
+            <p>Himpunan Mahasiswa Ilmu Komputer (HIMA ILKOM) — Universitas Narotama Surabaya</p>
+          </div>
         </div>
       </header>
 
