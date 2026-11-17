@@ -39,7 +39,25 @@ button, input, select { font: inherit; }
 
 .letter-wrap { display: flex; flex-direction: column; gap: 16px; }
 .letter { background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; padding: 48px 56px; font-family: 'Times New Roman', Times, serif; font-size: 15px; line-height: 1.55; color: #000; box-shadow: 0 4px 24px rgba(15, 23, 42, .08); }
-@media (max-width: 640px) { .letter { padding: 28px 20px; font-size: 14px; } }
+@media (max-width: 640px) {
+  .topbar-inner { gap: 12px; padding: 14px 16px; }
+  .topbar-logo { height: 44px; width: 44px; border-radius: 11px; padding: 4px; }
+  .wrap { padding: 16px 12px 40px; }
+  .panel { padding: 16px; }
+  .letter { padding: 20px 16px; font-size: 14px; }
+  .kop { padding-bottom: 8px; margin-bottom: 14px; }
+  .kop-logos { gap: 8px; }
+  .kop-logos img { width: 44px; height: 44px; }
+  .kop .org { font-size: 14px; }
+  .kop .univ { font-size: 13px; }
+  .kop .addr { font-size: 12px; }
+  .head-lines .k { width: 72px; }
+  .idtable { margin-left: 12px; }
+  .idtable td.lbl { width: 96px; }
+  .actions { flex-direction: column; }
+  .actions .btn { width: 100%; }
+  .sign .name { margin-top: 48px; }
+}
 
 .kop { text-align: center; border-bottom: 3px double #000; padding-bottom: 10px; margin-bottom: 18px; }
 .kop-logos { display: flex; align-items: center; gap: 14px; }
