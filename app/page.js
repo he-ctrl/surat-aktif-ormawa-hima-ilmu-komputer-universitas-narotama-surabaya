@@ -339,7 +339,6 @@ export default function Page() {
                     </ul>
                   )}
                 </div>
-                <div className="help">Ketik nama — bila pernah dibuat sebelumnya, pilih dari saran dan NIM, prodi, serta jabatan terisi otomatis.</div>
               </div>
               <div className="field">
                 <label htmlFor="nim">NIM <span>*</span></label>
