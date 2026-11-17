@@ -8,6 +8,26 @@ const BULAN_ROMAWI = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X
 
 const PENANDATANGAN = { nama: 'Hendryk Damastra', nim: '04123008', jabatan: 'Ketua', organisasi: 'Himpunan Mahasiswa Ilmu Komputer' };
 
+const PATH_PREFIX = '/surat-aktif-ormawa-hima-ilmu-komputer-universitas-narotama-surabaya';
+const ASSET_BASE = 'https://surat-aktif-ormawa-hima-ilmu-komput.vercel.app';
+// Aset di public/ diambil lewat path yang sama dengan halaman, supaya tetap
+// jalan baik di domain vercel.app maupun lewat rewrite hendrykdamastra.my.id.
+function assetPath(p) {
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith(PATH_PREFIX)) return PATH_PREFIX + p;
+  return p;
+}
+
+async function fetchLogoRun(path, ImageRun) {
+  try {
+    const r = await fetch(assetPath(path));
+    if (!r.ok) return null;
+    const buf = await r.arrayBuffer();
+    return new ImageRun({ data: buf, transformation: { width: 93, height: 93 } });
+  } catch {
+    return null;
+  }
+}
+
 function formatTanggal(d) {
   return `Surabaya, ${d.getDate()} ${BULAN_ID[d.getMonth()]} ${d.getFullYear()}`;
 }
@@ -93,15 +113,42 @@ export default function Page() {
     if (!submitted) return;
     setBusy('pdf');
     try {
-      const html2pdf = (await import('html2pdf.js')).default;
-      await html2pdf().set({
-        margin: [10, 12, 10, 12],
-        filename: `Surat-Aktif-Ormawa-${slug(nama)}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'] },
-      }).from(letterRef.current).save();
+      // Isi template PDF asli (dengan kop + logo) lewat pdf-lib — hasilnya A4.
+      const { fillSuratPdf } = await import('./lib/fillPdf.js');
+      const res = await fetch(assetPath('/surat-template.pdf'));
+      if (!res.ok) throw new Error('template tidak ditemukan');
+      const templateBytes = await res.arrayBuffer();
+      const bytes = await fillSuratPdf({
+        templateBytes,
+        nama: nama.trim(),
+        nim: nim.trim(),
+        prodi: prodi.trim(),
+        jabatan,
+        tanggalTampil,
+        nomorTampil,
+      });
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Surat-Aktif-Ormawa-${slug(nama)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      // Fallback bila template tidak bisa dimuat: render pratinjau HTML seperti sebelumnya.
+      try {
+        const html2pdf = (await import('html2pdf.js')).default;
+        await html2pdf().set({
+          margin: [10, 12, 10, 12],
+          filename: `Surat-Aktif-Ormawa-${slug(nama)}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['css', 'legacy'] },
+        }).from(letterRef.current).save();
+      } catch { /* abaikan */ }
     } finally {
       setBusy('');
     }
@@ -111,7 +158,50 @@ export default function Page() {
     if (!submitted) return;
     setBusy('docx');
     try {
-      const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, WidthType, BorderStyle } = await import('docx');
+      // Isi template docx asli (kop + 2 logo + layout asli, ukuran A4):
+      // hanya placeholder {{...}} yang diganti, sisanya tidak berubah.
+      const { fillSuratDocx } = await import('./lib/fillDocx.js');
+      const res = await fetch(assetPath('/surat-template.docx'));
+      if (!res.ok) throw new Error('template tidak ditemukan');
+      const blob = await fillSuratDocx({
+        templateBytes: await res.arrayBuffer(),
+        nama: nama.trim(),
+        nim: nim.trim(),
+        prodi: prodi.trim(),
+        jabatan,
+        tanggalTampil,
+        nomorTampil,
+      });
+      downloadBlob(blob, `Surat-Aktif-Ormawa-${slug(nama)}.docx`);
+      return;
+    } catch {
+      // Fallback bila template tidak bisa dimuat: bangun docx dari nol (dengan kop logo).
+      try {
+        const blob = await buildDocxFallback();
+        downloadBlob(blob, `Surat-Aktif-Ormawa-${slug(nama)}.docx`);
+      } catch { /* abaikan */ }
+    } finally {
+      setBusy('');
+    }
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function buildDocxFallback() {
+      const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, WidthType, BorderStyle, ImageRun } = await import('docx');
+
+      // Logo kop dari template asli (70pt, sama seperti di docx template).
+      const logoNarotama = await fetchLogoRun('/logo-narotama.png', ImageRun);
+      const logoHima = await fetchLogoRun('/logo-himailkom.png', ImageRun);
 
       const font = 'Times New Roman';
       const size = 24; // 12pt
@@ -128,14 +218,29 @@ export default function Page() {
       });
       const idTable = (rows) => new Table({ rows, width: { size: 100, type: WidthType.PERCENTAGE }, borders: noBorders });
 
+      const kopTable = new Table({
+        rows: [new TableRow({
+          children: [
+            new TableCell({ width: { size: 1400, type: WidthType.DXA }, children: [new Paragraph({ children: logoNarotama ? [logoNarotama] : [], alignment: AlignmentType.CENTER, spacing: { after: 0 } })], borders: noBorders }),
+            new TableCell({ width: { size: 6560, type: WidthType.DXA }, children: [
+              para(run('HIMPUNAN MAHASISWA ILMU KOMPUTER (HIMA ILKOM)', { bold: true, size: 28 }), { alignment: AlignmentType.CENTER, spacing: { after: 0 } }),
+              para(run('UNIVERSITAS NAROTAMA SURABAYA', { bold: true, size: 26 }), { alignment: AlignmentType.CENTER, spacing: { after: 0 } }),
+              para(run('Alamat : Jl. Arief Rahman Hakim No. 51 Surabaya', { size: 22 }), { alignment: AlignmentType.CENTER, spacing: { after: 0 } }),
+              para(run('Email : hima.ilmukomputer@narotama.ac.id', { size: 22, color: '0563C1', underline: {} }), { alignment: AlignmentType.CENTER, spacing: { after: 0 } }),
+            ], borders: noBorders }),
+            new TableCell({ width: { size: 1400, type: WidthType.DXA }, children: [new Paragraph({ children: logoHima ? [logoHima] : [], alignment: AlignmentType.CENTER, spacing: { after: 0 } })], borders: noBorders }),
+          ],
+        })],
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: { ...noBorders, bottom: { style: BorderStyle.DOUBLE, size: 12, color: '000000' } },
+      });
+
       const doc = new Document({
         sections: [{
           properties: { page: { margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } } },
           children: [
-            para(run('HIMPUNAN MAHASISWA ILMU KOMPUTER (HIMA ILKOM)', { bold: true, size: 28 }), { alignment: AlignmentType.CENTER, spacing: { after: 0 } }),
-            para(run('UNIVERSITAS NAROTAMA SURABAYA', { bold: true, size: 26 }), { alignment: AlignmentType.CENTER, spacing: { after: 0 } }),
-            para(run('Alamat : Jl. Arief Rahman Hakim No. 51 Surabaya', { size: 22 }), { alignment: AlignmentType.CENTER, spacing: { after: 0 } }),
-            para(run('Email : hima.ilmukomputer@narotama.ac.id', { size: 22 }), { alignment: AlignmentType.CENTER, border: { bottom: { color: '000000', space: 4, style: BorderStyle.DOUBLE, size: 12 } }, spacing: { after: 240 } }),
+            kopTable,
+            para(run(''), { spacing: { after: 240 } }),
             para(run(tanggalTampil), { alignment: AlignmentType.RIGHT, spacing: { after: 60 } }),
             idTable([idRow('Nomor', nomorTampil), idRow('Lampiran', '-'), idRow('Perihal', 'Surat Pemberitahuan')]),
             para(run('SURAT KETERANGAN AKTIF ORGANISASI', { bold: true, size: 28, underline: {} }), { alignment: AlignmentType.CENTER, spacing: { before: 120, after: 240 } }),
@@ -164,18 +269,7 @@ export default function Page() {
         }],
       });
 
-      const blob = await Packer.toBlob(doc);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Surat-Aktif-Ormawa-${slug(nama)}.docx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } finally {
-      setBusy('');
-    }
+      return Packer.toBlob(doc);
   }
 
   const tampil = (v) => (v && v.trim() !== '' ? v : '........');
@@ -260,10 +354,16 @@ export default function Page() {
           <section className="letter-wrap">
             <div className="letter" ref={letterRef}>
               <div className="kop">
-                <div className="org">HIMPUNAN MAHASISWA ILMU KOMPUTER (HIMA ILKOM)</div>
-                <div className="univ">UNIVERSITAS NAROTAMA SURABAYA</div>
-                <div className="addr">Alamat : Jl. Arief Rahman Hakim No. 51 Surabaya</div>
-                <div className="addr">Email : hima.ilmukomputer@narotama.ac.id</div>
+                <div className="kop-logos">
+                  <img src={`${ASSET_BASE}/logo-narotama.png`} alt="Logo Universitas Narotama" />
+                  <div className="kop-text">
+                    <div className="org">HIMPUNAN MAHASISWA ILMU KOMPUTER (HIMA ILKOM)</div>
+                    <div className="univ">UNIVERSITAS NAROTAMA SURABAYA</div>
+                    <div className="addr">Alamat : Jl. Arief Rahman Hakim No. 51 Surabaya</div>
+                    <div className="addr email">Email : hima.ilmukomputer@narotama.ac.id</div>
+                  </div>
+                  <img src={`${ASSET_BASE}/logo-himailkom.png`} alt="Logo HIMA ILKOM" />
+                </div>
               </div>
 
               <div className="date-line">{tanggalTampil}</div>
