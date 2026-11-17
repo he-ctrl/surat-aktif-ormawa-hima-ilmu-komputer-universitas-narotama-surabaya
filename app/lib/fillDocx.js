@@ -31,5 +31,7 @@ export async function fillSuratDocx({ templateBytes, nama, nim, prodi, jabatan, 
   }
   if (xml.includes('{{')) throw new Error('masih ada placeholder yang belum terisi');
   zip.file('word/document.xml', xml);
-  return zip.generateAsync({ type: outputType });
+  // mimeType docx yang benar — tanpa ini JSZip memberi application/zip
+  // dan unduhan di HP tersimpan/dibuka sebagai file .zip.
+  return zip.generateAsync({ type: outputType, mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 }
