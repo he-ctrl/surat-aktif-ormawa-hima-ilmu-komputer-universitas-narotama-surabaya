@@ -39,7 +39,7 @@ function wrapText(text, font, maxWidth) {
   return lines;
 }
 
-export async function fillSuratPdf({ templateBytes, nama, nim, prodi, jabatan, tanggalTampil, nomorTampil, tandaTangan = 'basah', signatureBytes = null }) {
+export async function fillSuratPdf({ templateBytes, nama, nim, prodi, jabatan, tanggalTampil, nomorTampil, tandaTangan = 'basah', signatureBytes = null, sigPos = null }) {
   const src = await PDFDocument.load(templateBytes);
   const out = await PDFDocument.create();
   const font = await out.embedFont(StandardFonts.TimesRoman);
@@ -96,18 +96,28 @@ export async function fillSuratPdf({ templateBytes, nama, nim, prodi, jabatan, t
   textRight('Universitas Narotama Surabaya', 540.45, 567.25 + ROW);
   // Tanda tangan digital: tempel PNG di celah antara "Universitas..." dan
   // nama (baseline nama ~666, baseline "Universitas..." ~589 — ruang ~77pt).
+  // Bila posisi digeser lewat drag & drop di pratinjau (sigPos {x, y} dalam
+  // persen terhadap halaman), gambar ditaruh pada posisi persen tersebut.
   if (tandaTangan === 'digital' && signatureBytes) {
     try {
       const sig = await out.embedPng(signatureBytes);
       const SIG_H = 58; // tinggi gambar (pt template)
       const SIG_W = SIG_H * (sig.width / sig.height);
-      const SIG_TOP = 594; // tepi atas gambar (koordinat dari-atas template)
-      page.drawImage(sig, {
-        x: X(540 - SIG_W),
-        y: Y(SIG_TOP + SIG_H),
-        width: SIG_W * S,
-        height: SIG_H * S,
-      });
+      if (sigPos) {
+        const w = SIG_W * S;
+        const h = SIG_H * S;
+        const x = (Math.min(96, Math.max(0, sigPos.x)) / 100) * A4_W;
+        const yTop = (Math.min(96, Math.max(0, sigPos.y)) / 100) * A4_H;
+        page.drawImage(sig, { x, y: A4_H - yTop - h, width: w, height: h });
+      } else {
+        const SIG_TOP = 594; // tepi atas gambar (koordinat dari-atas template)
+        page.drawImage(sig, {
+          x: X(540 - SIG_W),
+          y: Y(SIG_TOP + SIG_H),
+          width: SIG_W * S,
+          height: SIG_H * S,
+        });
+      }
     } catch { /* tanpa tanda tangan bila PNG gagal dimuat */ }
   }
   textRight('Hendryk Damastra', 540.12, 644.55 + ROW, fontBold);
