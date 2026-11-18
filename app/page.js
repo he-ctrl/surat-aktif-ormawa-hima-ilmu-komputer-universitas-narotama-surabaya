@@ -197,12 +197,15 @@ export default function Page() {
   function fitCustomDoc() {
     const container = customDocRef.current;
     if (!container) return;
-    const wrapper = container.querySelector('.docx-wrapper');
-    const page = wrapper && wrapper.querySelector('.docx');
-    if (!wrapper || !page) return;
-    const pageW = page.offsetWidth || 794;
+    const pages = container.querySelectorAll('.docx');
+    if (!pages.length) return;
+    pages.forEach((p) => { p.style.zoom = ''; });
+    const pageW = pages[0].offsetWidth || 794;
     const avail = container.clientWidth || pageW;
-    wrapper.style.zoom = String(Math.min(1, avail / pageW));
+    const z = String(Math.min(1, avail / pageW));
+    pages.forEach((p) => { p.style.zoom = z; });
+    const wrapper = container.querySelector('.docx-wrapper');
+    if (wrapper) wrapper.style.zoom = '';
   }
 
   // Pratinjau template kustom: isi DOCX dengan nilai form, lalu render
@@ -1041,7 +1044,7 @@ export default function Page() {
 
             <section className="letter-wrap">
               {!isCustom ? (
-                <div className="letter" ref={letterRef}>
+                <div key="builtin" className="letter" ref={letterRef}>
                   <div className="kop">
                     <div className="kop-logos">
                       <img src={`${ASSET_BASE}/logo-narotama.png`} alt="Logo Universitas Narotama" />
@@ -1105,7 +1108,7 @@ export default function Page() {
                   )}
                 </div>
               ) : (
-                <div className="letter letter-custom" ref={letterRef}>
+                <div key="custom" className="letter letter-custom" ref={letterRef}>
                   {customLoading && <p className="hint">Memuat pratinjau template…</p>}
                   {!customLoading && customError && <p className="msg err">{customError}</p>}
                   {!customLoading && !customError && (
