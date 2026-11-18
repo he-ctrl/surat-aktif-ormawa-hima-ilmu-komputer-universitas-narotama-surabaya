@@ -42,7 +42,13 @@ export async function fillSuratDocx({ templateBytes, nama, nim, prodi, jabatan, 
       // Posisi hasil drag & drop: gambar mengambang absolut di halaman.
       const anchor = anchorDrawingParagraph({ rid, cx, cy, sigPos });
       if (!xml.includes('</w:body>')) throw new Error('struktur template tidak dikenali (</w:body> tidak ada)');
-      xml = xml.replace('</w:body>', anchor + '</w:body>');
+      // <w:sectPr> harus tetap jadi anak terakhir <w:body> — sisipkan
+      // paragraf anchor SEBELUM sectPr terakhir (bukan setelahnya).
+      // Sisip setelah sectPr membuat header/footer (kop) hilang di
+      // docx-preview dan di hasil unduhan.
+      const sectIdx = xml.lastIndexOf('<w:sectPr');
+      if (sectIdx !== -1) xml = xml.slice(0, sectIdx) + anchor + xml.slice(sectIdx);
+      else xml = xml.replace('</w:body>', anchor + '</w:body>');
     } else {
       // Perilaku lama: gambar inline sebelum paragraf nama ("Hendryk
       // Damastra" di blok tanda tangan = kemunculan terakhir). Paragraf
