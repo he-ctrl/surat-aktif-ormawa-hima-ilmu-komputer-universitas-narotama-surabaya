@@ -263,7 +263,10 @@ header.pagehead p { margin: 6px 0 0; color: var(--label-secondary); font-size: 1
 .custom-doc .docx-wrapper { background: transparent; padding: 0; }
 .custom-doc .docx-wrapper > .docx { margin: 0 auto 16px; box-shadow: 0 4px 24px rgba(15, 23, 42, .12); }
 .custom-doc .docx-wrapper > .docx:last-child { margin-bottom: 0; }
-.custom-doc img { max-width: 100%; height: auto; }
+/* Gambar di ISI surat saja yang dibatasi lebarnya — gambar di header
+   (kop) tidak boleh dibatasi: sel header mengecil mengikuti isi dan
+   max-width: 100% dari lebar 0 membuat gambar kop menciut sampai hilang. */
+.custom-doc article img { max-width: 100%; height: auto; }
 @media (max-width: 640px) {
   header.pagehead { padding: 92px 16px 4px; }
   header.pagehead h1 { font-size: 28px; }

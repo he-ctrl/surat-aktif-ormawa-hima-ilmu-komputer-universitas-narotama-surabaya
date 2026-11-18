@@ -378,12 +378,23 @@ export default function Page() {
         return;
       }
       // Template kustom: render pratinjau HTML apa adanya.
+      // html2canvas tidak memahami CSS zoom dan memotong isi yang meluber
+      // dari kolom sempit HP — lebarkan dulu surat ke ukuran alami
+      // (lebar halaman DOCX), baru kembalikan setelah PDF jadi.
+      const letterEl = letterRef.current;
+      const customEl = customDocRef.current;
+      if (letterEl) letterEl.style.width = 'max-content';
+      if (customEl) {
+        customEl.style.overflowX = 'visible';
+        customEl.style.width = 'max-content';
+        customEl.querySelectorAll('.docx').forEach((p) => { p.style.zoom = ''; });
+      }
       const html2pdf = (await import('html2pdf.js')).default;
       await html2pdf().set({
         margin: [10, 12, 10, 12],
         filename: `${slug(selected.name)}-${slug(namaValue)}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
+        html2canvas: { scale: 2, useCORS: true, windowWidth: 1000, width: letterEl.offsetWidth },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['css', 'legacy'] },
       }).from(letterRef.current).save();
@@ -395,12 +406,20 @@ export default function Page() {
           margin: [10, 12, 10, 12],
           filename: `${slug(selected.name)}-${slug(namaValue)}.pdf`,
           image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true },
+          html2canvas: { scale: 2, useCORS: true, windowWidth: 1000, width: letterRef.current ? letterRef.current.offsetWidth : undefined },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
           pagebreak: { mode: ['css', 'legacy'] },
         }).from(letterRef.current).save();
       } catch { setErrorMsg('PDF gagal dibuat. Coba lagi.'); }
     } finally {
+      if (isCustom) {
+        if (letterRef.current) letterRef.current.style.width = '';
+        if (customDocRef.current) {
+          customDocRef.current.style.overflowX = '';
+          customDocRef.current.style.width = '';
+        }
+        fitCustomDoc();
+      }
       setBusy('');
     }
   }
