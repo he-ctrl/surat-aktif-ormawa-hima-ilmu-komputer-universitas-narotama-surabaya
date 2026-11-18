@@ -652,8 +652,10 @@ export default function Page() {
     }
   }
 
+  // Reset langsung tanpa window.confirm: dialog native tidak bisa diklik
+  // oleh otomasi browser (auto-dismiss = batal), sehingga tombol terlihat
+  // tidak bereaksi. Reset ini aman — tanda tangan bisa diunggah ulang.
   async function handleSigReset() {
-    if (!window.confirm('Kembalikan ke tanda tangan bawaan?')) return;
     setSigMsg('');
     setSigError('');
     try {
