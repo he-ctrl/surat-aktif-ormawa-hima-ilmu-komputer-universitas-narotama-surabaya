@@ -46,12 +46,19 @@ export async function POST(request) {
   const file = form.get('file');
   if (!name) return Response.json({ error: 'Nama template wajib diisi.' }, { status: 400 });
   if (!file || typeof file === 'string') return Response.json({ error: 'File DOCX wajib diunggah.' }, { status: 400 });
-  if (!/\.docx$/i.test(file.name || '')) return Response.json({ error: 'File harus berformat .docx.' }, { status: 400 });
   if (file.size > MAX_FILE_BYTES) {
     return Response.json({ error: `File terlalu besar (${Math.round(file.size / 1024)} KB). Maksimal 500 KB — kompres gambar di dalam dokumen lalu unggah ulang.` }, { status: 400 });
   }
   let bytes;
   try { bytes = new Uint8Array(await file.arrayBuffer()); } catch { return Response.json({ error: 'File tidak bisa dibaca.' }, { status: 400 }); }
+  // File .doc (Word lama, format biner OLE) tidak bisa diisi seperti .docx
+  // (zip + XML) — deteksi dari ekstensi maupun magic bytes-nya, lalu arahkan
+  // owner untuk menyimpan ulang sebagai .docx di Word/WPS.
+  const isOle = bytes.length >= 4 && bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0;
+  if (/\.doc$/i.test(file.name || '') || isOle) {
+    return Response.json({ error: 'File .doc (format Word lama) belum bisa dipakai langsung. Buka di Word/WPS, lalu File → Save As → pilih “Word Document (*.docx)”, simpan, dan unggah file .docx-nya.' }, { status: 400 });
+  }
+  if (!/\.docx$/i.test(file.name || '')) return Response.json({ error: 'File harus berformat .docx.' }, { status: 400 });
   let documentXml;
   try {
     const zip = await JSZip.loadAsync(bytes);
