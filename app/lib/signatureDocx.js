@@ -45,6 +45,12 @@ export function inlineDrawingParagraph({ rid, cx, cy }) {
   return `<w:p><w:pPr><w:pStyle w:val="style0"/><w:ind w:right="357"/><w:jc w:val="right"/><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:rPr/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="1" name="Tanda tangan"/><wp:cNvGraphicFramePr/>${graphicXml(rid, cx, cy)}</wp:inline></w:drawing></w:r></w:p>`;
 }
 
+// Gambar inline di dalam alur paragraf — dipakai saat template kustom
+// menulis {tanda tangan}: gambar disisipkan tepat di posisi token.
+export function inlineDrawingRun({ rid, cx, cy }) {
+  return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="1" name="Tanda tangan"/><wp:cNvGraphicFramePr/>${graphicXml(rid, cx, cy)}</wp:inline></w:drawing></w:r>`;
+}
+
 // Paragraf gambar mengambang (wp:anchor) pada posisi persen halaman A4.
 // sigPos: { x, y } dalam persen (0-100) dari tepi kiri/atas halaman.
 export function anchorDrawingParagraph({ rid, cx, cy, sigPos }) {

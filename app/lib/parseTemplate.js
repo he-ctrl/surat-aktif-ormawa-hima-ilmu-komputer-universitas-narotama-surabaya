@@ -17,7 +17,9 @@ export const PARAM_TYPES = {
   radio: 'radio',
 };
 
-export const SYSTEM_PARAMS = new Set(['tanggal', 'nomor']);
+// {tanda tangan} juga parameter sistem — bukan isian form: posisi tanda
+// tangan di dalam isi template, diganti gambar tanda tangan digital.
+export const SYSTEM_PARAMS = new Set(['tanggal', 'nomor', 'tanda tangan']);
 
 const NAME_RE = /^[A-Za-z][A-Za-z0-9 _-]*$/;
 const ACRONYMS = { nim: 'NIM' };
@@ -48,6 +50,7 @@ export function parsePlaceholders(text) {
   const params = [];
   const warnings = [];
   const seen = new Set();
+  let hasSignatureToken = false;
   let m;
   TOKEN_RE.lastIndex = 0;
   while ((m = TOKEN_RE.exec(text || '')) !== null) {
@@ -61,6 +64,7 @@ export function parsePlaceholders(text) {
       continue;
     }
     const key = name.toLowerCase();
+    if (key === 'tanda tangan') { hasSignatureToken = true; continue; } // posisi tanda tangan, bukan form
     if (SYSTEM_PARAMS.has(key)) continue; // tanggal/nomor diisi otomatis
     if (seen.has(key)) continue; // pakai kemunculan pertama
     seen.add(key);
@@ -80,7 +84,7 @@ export function parsePlaceholders(text) {
     }
     params.push({ name, label: labelize(name), type, options });
   }
-  return { params, warnings };
+  return { params, warnings, hasSignatureToken };
 }
 
 // Token yang ditemukan di teks tapi TIDAK muncul utuh di XML mentah —
