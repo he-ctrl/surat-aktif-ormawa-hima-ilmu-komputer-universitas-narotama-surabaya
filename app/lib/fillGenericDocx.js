@@ -81,7 +81,13 @@ export async function fillGenericDocx({ templateBytes, values, tandaTangan = 'ba
     const pos = sigPos || { x: 68, y: 80 };
     const anchor = anchorDrawingParagraph({ rid, cx, cy, sigPos: pos });
     if (!xml.includes('</w:body>')) throw new Error('struktur template tidak dikenali (</w:body> tidak ada)');
-    xml = xml.replace('</w:body>', anchor + '</w:body>');
+    // <w:sectPr> harus tetap jadi anak terakhir <w:body> — sisipkan
+    // paragraf anchor SEBELUM sectPr terakhir (bukan setelahnya).
+    // Sisip setelah sectPr membuat header/footer (kop) hilang di
+    // docx-preview dan di hasil unduhan.
+    const sectIdx = xml.lastIndexOf('<w:sectPr');
+    if (sectIdx !== -1) xml = xml.slice(0, sectIdx) + anchor + xml.slice(sectIdx);
+    else xml = xml.replace('</w:body>', anchor + '</w:body>');
   }
 
   zip.file('word/document.xml', xml);
