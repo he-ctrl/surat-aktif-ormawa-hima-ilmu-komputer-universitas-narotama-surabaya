@@ -17,6 +17,15 @@ function assetPath(p) {
   return p;
 }
 
+// Panggilan API memakai prefix yang sama: di hendrykdamastra.my.id halaman
+// disajikan di bawah PATH_PREFIX dan hanya path itu yang di-rewrite ke aplikasi
+// surat — /api/... di root domain justru mengenai situs personal (404 HTML),
+// sehingga login (dan semua API lain) gagal di domain kustom.
+function apiPath(p) {
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith(PATH_PREFIX)) return PATH_PREFIX + p;
+  return p;
+}
+
 async function fetchLogoRun(path, ImageRun) {
   try {
     const r = await fetch(assetPath(path));
@@ -97,7 +106,7 @@ export default function Page() {
 
   async function refreshTemplates(selectId) {
     try {
-      const d = await (await fetch('/api/templates')).json();
+      const d = await (await fetch(apiPath('/api/templates'))).json();
       if (Array.isArray(d.templates) && d.templates.length > 0) {
         setTemplates(d.templates);
         const pick = d.templates.find((t) => t.id === selectId)
@@ -117,11 +126,11 @@ export default function Page() {
   // Muat template, nama tersimpan, dan status login owner.
   useEffect(() => {
     refreshTemplates();
-    fetch('/api/names')
+    fetch(apiPath('/api/names'))
       .then((r) => r.json())
       .then((d) => { if (Array.isArray(d.records)) setRecords(d.records); })
       .catch(() => {});
-    fetch('/api/auth')
+    fetch(apiPath('/api/auth'))
       .then((r) => r.json())
       .then((d) => { if (d.user) setOwner(d.user); })
       .catch(() => {});
@@ -133,7 +142,7 @@ export default function Page() {
     if (bytesCache.current.has(selected.id)) { setCustomBytes(bytesCache.current.get(selected.id)); return; }
     let cancelled = false;
     setCustomLoading(true);
-    fetch(`/api/template-file/${selected.id}`)
+    fetch(apiPath(`/api/template-file/${selected.id}`))
       .then((r) => { if (!r.ok) throw new Error('file template tidak ditemukan'); return r.arrayBuffer(); })
       .then((bytes) => {
         if (cancelled) return;
@@ -233,7 +242,7 @@ export default function Page() {
     setSubmitted({ tanggal: formatTanggal(d), nomor: formatNomor(d) });
     // Simpan nama ke database supaya muncul sebagai saran berikutnya.
     if (namaValue.trim()) {
-      fetch('/api/names', {
+      fetch(apiPath('/api/names'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nama: namaValue.trim(), nim: (values.nim || '').trim(), prodi: (values.prodi || '').trim(), jabatan: values.jabatan || '' }),
@@ -508,7 +517,7 @@ export default function Page() {
     setLoginBusy(true);
     setLoginError('');
     try {
-      const res = await fetch('/api/auth', {
+      const res = await fetch(apiPath('/api/auth'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: loginUser.trim(), password: loginPass }),
@@ -528,7 +537,7 @@ export default function Page() {
   }
 
   async function handleLogout() {
-    try { await fetch('/api/auth', { method: 'DELETE' }); } catch { /* abaikan */ }
+    try { await fetch(apiPath('/api/auth'), { method: 'DELETE' }); } catch { /* abaikan */ }
     setOwner(null);
     setMustChange(false);
   }
@@ -545,7 +554,7 @@ export default function Page() {
       form.append('name', uploadName.trim());
       form.append('description', uploadDesc.trim());
       form.append('file', file);
-      const res = await fetch('/api/templates', { method: 'POST', body: form });
+      const res = await fetch(apiPath('/api/templates'), { method: 'POST', body: form });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || 'Unggah gagal.');
       setUploadResult(d);
@@ -566,7 +575,7 @@ export default function Page() {
   async function handleDeleteTemplate(id) {
     if (!window.confirm('Hapus template ini? Pengguna tidak akan bisa lagi membuat surat dari template ini.')) return;
     try {
-      const res = await fetch(`/api/templates?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const res = await fetch(apiPath(`/api/templates?id=${encodeURIComponent(id)}`), { method: 'DELETE' });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || 'Hapus gagal.');
       const list = await refreshTemplates();
@@ -581,7 +590,7 @@ export default function Page() {
 
   async function handleSetDefault(id) {
     try {
-      const res = await fetch('/api/templates', {
+      const res = await fetch(apiPath('/api/templates'), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, isDefault: true }),
@@ -598,7 +607,7 @@ export default function Page() {
     e.preventDefault();
     setPwMsg('');
     try {
-      const res = await fetch('/api/auth', {
+      const res = await fetch(apiPath('/api/auth'), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ currentPassword: pwCurrent, newPassword: pwNew }),
