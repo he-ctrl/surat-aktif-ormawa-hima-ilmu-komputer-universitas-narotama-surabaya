@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { BUILTIN_TEMPLATE, PRODI_OPTIONS, JABATAN_OPTIONS } from './lib/builtinTemplate.js';
+import { formatNomor, DEFAULT_NOMOR_FORMAT, NOMOR_PLACEHOLDERS } from './lib/nomorFormat.js';
 
 const BULAN_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-const BULAN_ROMAWI = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 
 const PENANDATANGAN = { nama: 'Hendryk Damastra', nim: '04123008', jabatan: 'Ketua', organisasi: 'Himpunan Mahasiswa Ilmu Komputer' };
 
@@ -43,10 +43,6 @@ async function fetchLogoRun(path, ImageRun) {
 
 function formatTanggal(d) {
   return `Surabaya, ${d.getDate()} ${BULAN_ID[d.getMonth()]} ${d.getFullYear()}`;
-}
-
-function formatNomor(d) {
-  return `01/HIMAILKOM/${d.getDate()}/${BULAN_ROMAWI[d.getMonth()]}/${d.getFullYear()}`;
 }
 
 function slug(s) {
@@ -103,6 +99,11 @@ export default function Page() {
   const [sigBusy, setSigBusy] = useState(false);
   const [sigMsg, setSigMsg] = useState('');
   const [sigError, setSigError] = useState('');
+  const [nomorFormat, setNomorFormat] = useState(DEFAULT_NOMOR_FORMAT);
+  const [nomorInput, setNomorInput] = useState(DEFAULT_NOMOR_FORMAT);
+  const [nomorBusy, setNomorBusy] = useState(false);
+  const [nomorMsg, setNomorMsg] = useState('');
+  const [nomorError, setNomorError] = useState('');
 
   const letterRef = useRef(null);
   const sigImgRef = useRef(null);
@@ -144,6 +145,10 @@ export default function Page() {
       .then((r) => r.json())
       .then((d) => { if (d.user) setOwner(d.user); })
       .catch(() => {});
+    fetch(apiPath('/api/settings'))
+      .then((r) => r.json())
+      .then((d) => { if (d.nomorFormat) { setNomorFormat(d.nomorFormat); setNomorInput(d.nomorFormat); } })
+      .catch(() => {});
   }, []);
 
   // Ambil bytes DOCX template kustom terpilih (untuk pratinjau + unduhan).
@@ -170,7 +175,7 @@ export default function Page() {
 
   const now = new Date();
   const tanggalTampil = submitted ? submitted.tanggal : formatTanggal(now);
-  const nomorTampil = submitted ? submitted.nomor : formatNomor(now);
+  const nomorTampil = submitted ? submitted.nomor : formatNomor(now, nomorFormat);
 
   // Pratinjau template kustom: isi DOCX dengan nilai form, lalu render
   // ke HTML lewat mammoth (debounce 400ms supaya mengetik tetap ringan).
@@ -485,6 +490,10 @@ export default function Page() {
   // Template bawaan: tanda tangan awalnya di alur normal; saat mulai diseret,
   // posisinya diukur lalu pindah jadi overlay mengambang. Template kustom:
   // selalu overlay sejak awal (posisi awal kanan bawah).
+  // PENTING: pindah ke overlay HANYA setelah pointer benar-benar bergerak
+  // (ambang 6px). Ketukan biasa — misalnya jari menyentuh gambar saat
+  // menggulir di HP — tidak boleh membalikkan tata letak: dalam mode overlay
+  // nama naik ke posisi gambar dan gambar menimpa nama (terlihat "aneh").
   function startSigDrag(e) {
     if (tandaTangan !== 'digital') return;
     e.preventDefault();
@@ -492,16 +501,23 @@ export default function Page() {
     if (!letter) return;
     const rect = letter.getBoundingClientRect();
     let start = sigPos;
-    if (sigMode === 'inline' && sigImgRef.current) {
-      const r = sigImgRef.current.getBoundingClientRect();
-      start = { x: ((r.left - rect.left) / rect.width) * 100, y: ((r.top - rect.top) / rect.height) * 100 };
-      setSigPos(start);
-      setSigMode('overlay');
-    }
-    if (!start) start = { ...DEFAULT_SIG_POS };
+    let converted = false;
     const startX = e.clientX;
     const startY = e.clientY;
     const move = (ev) => {
+      const totalDx = ev.clientX - startX;
+      const totalDy = ev.clientY - startY;
+      if (!converted) {
+        if (Math.hypot(totalDx, totalDy) < 6) return;
+        if (sigMode === 'inline' && sigImgRef.current) {
+          const r = sigImgRef.current.getBoundingClientRect();
+          start = { x: ((r.left - rect.left) / rect.width) * 100, y: ((r.top - rect.top) / rect.height) * 100 };
+          setSigPos(start);
+          setSigMode('overlay');
+        }
+        if (!start) start = { ...DEFAULT_SIG_POS };
+        converted = true;
+      }
       const dx = ((ev.clientX - startX) / rect.width) * 100;
       const dy = ((ev.clientY - startY) / rect.height) * 100;
       setSigPos({ x: clamp(start.x + dx, 2, 88), y: clamp(start.y + dy, 2, 94) });
@@ -651,6 +667,29 @@ export default function Page() {
     }
   }
 
+  async function handleNomorSave(e) {
+    e.preventDefault();
+    setNomorMsg('');
+    setNomorError('');
+    setNomorBusy(true);
+    try {
+      const res = await fetch(apiPath('/api/settings'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nomorFormat: nomorInput }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Gagal menyimpan format nomor.');
+      setNomorFormat(d.nomorFormat);
+      setNomorInput(d.nomorFormat);
+      setNomorMsg(`Format nomor disimpan. Contoh nomor hari ini: ${formatNomor(new Date(), d.nomorFormat)}`);
+    } catch (err) {
+      setNomorError(err?.message || 'Gagal menyimpan format nomor.');
+    } finally {
+      setNomorBusy(false);
+    }
+  }
+
   async function handleChangePassword(e) {
     e.preventDefault();
     setPwMsg('');
@@ -718,7 +757,7 @@ export default function Page() {
         {owner && (
           <section className="panel owner-panel">
             <h2>Dasbor Owner</h2>
-            <p className="hint">Kamu login sebagai <b>{owner.username}</b>. Di sini kamu bisa mengunggah template surat baru (file DOCX), menghapus template kustom, memilih template utama, serta mengganti gambar tanda tangan.</p>
+            <p className="hint">Kamu login sebagai <b>{owner.username}</b>. Di sini kamu bisa mengunggah template surat baru (file DOCX), menghapus template kustom, memilih template utama, mengganti gambar tanda tangan, serta mengatur format nomor surat.</p>
             {mustChange && <p className="msg warn">Kamu masih memakai password default. Ubah password di bawah ini.</p>}
 
             <h3>Template surat</h3>
@@ -790,6 +829,22 @@ export default function Page() {
               <button className="btn btn-primary" type="submit" disabled={sigBusy}>{sigBusy ? 'Mengunggah…' : 'Unggah Tanda Tangan'}</button>
               {' '}
               <button className="btn btn-outline" type="button" onClick={handleSigReset}>Kembalikan ke bawaan</button>
+            </form>
+
+            <h3>Format nomor surat</h3>
+            <p className="hint">Nomor surat diisi otomatis dari tanggal surat dibuat. Tulis formatnya di bawah ini — bagian lain di luar placeholder dibiarkan apa adanya.</p>
+            <form onSubmit={handleNomorSave}>
+              <div className="field">
+                <label htmlFor="nomor-format">Format nomor *</label>
+                <input id="nomor-format" type="text" value={nomorInput} onChange={(e) => setNomorInput(e.target.value)} placeholder="01/HIMAILKOM/{waktu.tanggal}/{waktu.bulan.romawi}/{waktu.tahun}" required />
+              </div>
+              <p className="help">
+                Placeholder yang bisa dipakai: <code>{NOMOR_PLACEHOLDERS.join(', ')}</code>.
+                Contoh nomor hari ini: <b>{formatNomor(new Date(), nomorInput)}</b>
+              </p>
+              {nomorError && <p className="msg err">{nomorError}</p>}
+              {nomorMsg && <p className="msg">{nomorMsg}</p>}
+              <button className="btn btn-primary" type="submit" disabled={nomorBusy}>{nomorBusy ? 'Menyimpan…' : 'Simpan Format Nomor'}</button>
             </form>
 
             <h3>Ubah password owner</h3>
@@ -902,7 +957,7 @@ export default function Page() {
                       {namaValue.trim() === '' && (<div className="help">Isi nama di atas dulu untuk mengirim.</div>)}
                     </div>
                   )}
-                  {tandaTangan === 'digital' && sigDragged && (
+                  {tandaTangan === 'digital' && (sigDragged || sigMode === 'overlay') && (
                     <div className="wa-row">
                       <button type="button" className="btn-ghost" onClick={resetSigPos}>Kembalikan posisi tanda tangan</button>
                     </div>
