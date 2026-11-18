@@ -12,6 +12,7 @@ const KV_TOKEN = process.env.KV_REST_API_TOKEN || '';
 
 export const TEMPLATES_KEY = 'surat-aktif:templates';
 export const SIGNATURE_KEY = 'surat-aktif:signature';
+export const SETTINGS_KEY = 'surat-aktif:settings';
 export const USERS_KEY = 'surat-aktif:users';
 export const SESSIONS_KEY = 'surat-aktif:sessions';
 export const SESSION_COOKIE = 'surat_owner_session';
