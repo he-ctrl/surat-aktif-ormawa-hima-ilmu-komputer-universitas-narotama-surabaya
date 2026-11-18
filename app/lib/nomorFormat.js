@@ -11,15 +11,19 @@ const BULAN_ROMAWI = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X
 export const DEFAULT_NOMOR_FORMAT = '01/HIMAILKOM/{waktu.tanggal}/{waktu.bulan.romawi}/{waktu.tahun}';
 export const NOMOR_PLACEHOLDERS = ['{waktu.tanggal}', '{waktu.bulan}', '{waktu.tahun}', '{waktu.bulan.romawi}'];
 
+export function waktuValues(d) {
+  return {
+    'waktu.tanggal': String(d.getDate()),
+    'waktu.bulan': String(d.getMonth() + 1),
+    'waktu.tahun': String(d.getFullYear()),
+    'waktu.bulan.romawi': BULAN_ROMAWI[d.getMonth()],
+  };
+}
+
 export function formatNomor(d, format) {
   const f = (format && format.trim()) || DEFAULT_NOMOR_FORMAT;
-  const values = {
-    '{waktu.tanggal}': String(d.getDate()),
-    '{waktu.bulan}': String(d.getMonth() + 1),
-    '{waktu.tahun}': String(d.getFullYear()),
-    '{waktu.bulan.romawi}': BULAN_ROMAWI[d.getMonth()],
-  };
-  return f.replace(/\{waktu\.(tanggal|bulan\.romawi|bulan|tahun)\}/g, (m) => values[m] ?? m);
+  const wv = waktuValues(d);
+  return f.replace(/\{waktu\.(tanggal|bulan\.romawi|bulan|tahun)\}/g, (m) => wv[m.slice(1, -1)] ?? m);
 }
 
 export function validateNomorFormat(format) {
