@@ -75,7 +75,19 @@ export default function Page() {
   const [sigDragged, setSigDragged] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [customBytes, setCustomBytes] = useState(null); // bytes DOCX template kustom terpilih
-  const [customHtml, setCustomHtml] = useState('');
+  const [hasSigToken, setHasSigToken] = useState(false);
+  const customDocRef = useRef(null);
+
+  // Deteksi token {tanda tangan} di isi template kustom (dari bytes DOCX).
+  async function detectSigToken(bytes) {
+    try {
+      const { default: JSZip } = await import('jszip');
+      const zip = await JSZip.loadAsync(bytes);
+      const docXml = zip.file('word/document.xml');
+      const docText = docXml ? await docXml.async('string') : '';
+      setHasSigToken(/\{\s*tanda tangan(\s*\|[^}]*)?\}/i.test(docText));
+    } catch { setHasSigToken(false); }
+  }
   const [customLoading, setCustomLoading] = useState(false);
   const [customError, setCustomError] = useState('');
 
@@ -153,16 +165,17 @@ export default function Page() {
 
   // Ambil bytes DOCX template kustom terpilih (untuk pratinjau + unduhan).
   useEffect(() => {
-    if (!selected || selected.kind !== 'custom') { setCustomBytes(null); setCustomHtml(''); setCustomError(''); return; }
-    if (bytesCache.current.has(selected.id)) { setCustomBytes(bytesCache.current.get(selected.id)); return; }
+    if (!selected || selected.kind !== 'custom') { setCustomBytes(null); setHasSigToken(false); setCustomError(''); return; }
+    if (bytesCache.current.has(selected.id)) { const cached = bytesCache.current.get(selected.id); setCustomBytes(cached); detectSigToken(cached); return; }
     let cancelled = false;
     setCustomLoading(true);
     fetch(apiPath(`/api/template-file/${selected.id}`))
       .then((r) => { if (!r.ok) throw new Error('file template tidak ditemukan'); return r.arrayBuffer(); })
-      .then((bytes) => {
+      .then(async (bytes) => {
         if (cancelled) return;
         bytesCache.current.set(selected.id, bytes);
         setCustomBytes(bytes);
+        await detectSigToken(bytes);
         setCustomLoading(false);
       })
       .catch(() => {
@@ -177,11 +190,30 @@ export default function Page() {
   const tanggalTampil = submitted ? submitted.tanggal : formatTanggal(now);
   const nomorTampil = submitted ? submitted.nomor : formatNomor(now, nomorFormat);
 
+  // Pas-kan lebar halaman DOCX (A4 ~794px) ke kolom pratinjau yang lebih
+  // sempit: perkecil dengan zoom supaya susunan baris dan halaman tetap
+  // sama persis seperti di DOCX, bukan di-reflow. Tanpa zoom, halaman
+  // akan meluber dan harus digeser horizontal.
+  function fitCustomDoc() {
+    const container = customDocRef.current;
+    if (!container) return;
+    const wrapper = container.querySelector('.docx-wrapper');
+    const page = wrapper && wrapper.querySelector('.docx');
+    if (!wrapper || !page) return;
+    const pageW = page.offsetWidth || 794;
+    const avail = container.clientWidth || pageW;
+    wrapper.style.zoom = String(Math.min(1, avail / pageW));
+  }
+
   // Pratinjau template kustom: isi DOCX dengan nilai form, lalu render
-  // ke HTML lewat mammoth (debounce 400ms supaya mengetik tetap ringan).
+  // DOCX-nya apa adanya lewat docx-preview (debounce 400ms supaya mengetik
+  // tetap ringan) — kop di header, logo, ukuran font, semua pengaturan,
+  // dan halaman tampil sama persis seperti di file DOCX. Mammoth tidak
+  // dipakai lagi: ia membuang header/footer dan meratakan gaya dokumen.
   // Isian kosong ditampilkan sebagai '........' di pratinjau saja.
   useEffect(() => {
     if (!selected || selected.kind !== 'custom' || !customBytes) return;
+    let cancelled = false;
     const t = setTimeout(async () => {
       try {
         const { fillGenericDocx } = await import('./lib/fillGenericDocx.js');
@@ -193,25 +225,32 @@ export default function Page() {
           const v = (values[p.name] || '').trim();
           previewValues[p.name] = v !== '' ? values[p.name] : '........';
         }
+        // Bila template memakai token {tanda tangan}, pratinjau juga
+        // menaruh gambar tanda tangan digital di posisi token itu.
+        const useDigitalSig = tandaTangan === 'digital' && hasSigToken;
         const filled = await fillGenericDocx({
-          templateBytes: customBytes, values: previewValues, tandaTangan: 'basah', outputType: 'arraybuffer',
+          templateBytes: customBytes, values: previewValues,
+          tandaTangan: useDigitalSig ? 'digital' : 'basah',
+          signatureBytes: useDigitalSig ? await fetchSignatureBytes() : null,
+          outputType: 'arraybuffer',
         });
-        const mammoth = (await import('mammoth')).default;
-        // ignoreEmptyParagraphs: false — paragraf kosong di template DOCX
-        // harus tampil sebagai baris kosong di pratinjau (bukan hilang).
-        const { value } = await mammoth.convertToHtml({ arrayBuffer: filled }, {
-          ignoreEmptyParagraphs: false,
-          convertImage: mammoth.images.imgElement((image) =>
-            image.read('base64').then((b64) => ({ src: `data:${image.contentType};base64,${b64}` }))),
-        });
-        setCustomHtml(value);
+        if (cancelled) return;
+        const { renderAsync } = await import('docx-preview');
+        const container = customDocRef.current;
+        if (!container) return;
+        container.innerHTML = '';
+        await renderAsync(filled, container, undefined, { inWrapper: true, breakPages: true });
+        if (cancelled) return;
+        fitCustomDoc();
         setCustomError('');
       } catch (err) {
-        setCustomError(err?.message || 'Pratinjau gagal dibuat.');
+        if (!cancelled) setCustomError(err?.message || 'Pratinjau gagal dibuat.');
       }
     }, 400);
-    return () => clearTimeout(t);
-  }, [customBytes, values, tanggalTampil, nomorTampil, selected?.id]);
+    const onResize = () => fitCustomDoc();
+    window.addEventListener('resize', onResize);
+    return () => { cancelled = true; clearTimeout(t); window.removeEventListener('resize', onResize); };
+  }, [customBytes, values, tanggalTampil, nomorTampil, selected?.id, tandaTangan, hasSigToken]);
 
   // Saran nama yang cocok dengan ketikan (maks. 6).
   const namaValue = values.nama || '';
@@ -805,7 +844,7 @@ export default function Page() {
                 <p className="help">File .doc (Word lama) belum bisa dipakai langsung — buka di Word/WPS, lalu File → Save As → pilih “Word Document (*.docx)”, simpan, dan unggah file .docx-nya.</p>
               </div>
               <p className="help">
-                Tulis placeholder di dalam dokumen dengan format <code>{'{nama | string}'}</code>, <code>{'{prodi | dropdown | Sistem Komputer, Teknik Informatika}'}</code>, atau <code>{'{jabatan | radio | Sekretaris, Bendahara}'}</code>. <code>{'{tanggal}'}</code> dan <code>{'{nomor}'}</code> diisi otomatis. Placeholder waktu <code>{'{waktu.tanggal}'}</code>, <code>{'{waktu.bulan}'}</code>, <code>{'{waktu.tahun}'}</code>, dan <code>{'{waktu.bulan.romawi}'}</code> juga bisa ditulis langsung di isi dokumen. Ketik placeholder dalam sekali ketik — jangan diedit di tengah kata, supaya tidak terpotong.
+                Tulis placeholder di dalam dokumen dengan format <code>{'{nama | string}'}</code>, <code>{'{prodi | dropdown | Sistem Komputer, Teknik Informatika}'}</code>, atau <code>{'{jabatan | radio | Sekretaris, Bendahara}'}</code>. <code>{'{tanggal}'}</code> dan <code>{'{nomor}'}</code> diisi otomatis. Placeholder waktu <code>{'{waktu.tanggal}'}</code>, <code>{'{waktu.bulan}'}</code>, <code>{'{waktu.tahun}'}</code>, dan <code>{'{waktu.bulan.romawi}'}</code> juga bisa ditulis langsung di isi dokumen. Tulis <code>{'{tanda tangan}'}</code> di posisi tanda tangan bila tanda tangan ingin ditempel di situ (bukan digeser) — tanda tangan digital disisipkan tepat di sana. Ketik placeholder dalam sekali ketik — jangan diedit di tengah kata, supaya tidak terpotong.
               </p>
               {uploadError && <p className="msg err">{uploadError}</p>}
               <button className="btn btn-primary" type="submit" disabled={uploadBusy}>{uploadBusy ? 'Mengunggah…' : 'Unggah Template'}</button>
@@ -1069,13 +1108,10 @@ export default function Page() {
                 <div className="letter letter-custom" ref={letterRef}>
                   {customLoading && <p className="hint">Memuat pratinjau template…</p>}
                   {!customLoading && customError && <p className="msg err">{customError}</p>}
-                  {!customLoading && !customError && customHtml && (
-                    <div className="custom-doc" dangerouslySetInnerHTML={{ __html: customHtml }} />
+                  {!customLoading && !customError && (
+                    <div className="custom-doc" ref={customDocRef} />
                   )}
-                  {!customLoading && !customError && !customHtml && (
-                    <p className="hint">Pratinjau template akan muncul di sini.</p>
-                  )}
-                  {tandaTangan === 'digital' && sigPos && (
+                  {tandaTangan === 'digital' && sigPos && !hasSigToken && (
                     <img className={owner ? 'sign-drag sign-draggable' : 'sign-drag'} style={{ left: `${sigPos.x}%`, top: `${sigPos.y}%` }} src={sigUrl} alt={owner ? 'Tanda tangan Hendryk Damastra — seret untuk memindahkan' : 'Tanda tangan Hendryk Damastra'} onPointerDown={owner ? startSigDrag : undefined} draggable={false} />
                   )}
                 </div>
@@ -1086,7 +1122,7 @@ export default function Page() {
                 <button className="btn btn-outline" type="button" onClick={handlePdf} disabled={!submitted || busy !== ''}>{busy === 'pdf' ? 'Membuat PDF…' : 'Unduh PDF'}</button>
                 <button className="btn btn-outline" type="button" onClick={handleDocx} disabled={!submitted || busy !== ''}>{busy === 'docx' ? 'Membuat DOCX…' : 'Unduh DOCX'}</button>
               </div>
-              {tandaTangan === 'digital' && owner && (
+              {tandaTangan === 'digital' && owner && !hasSigToken && (
                 <p className="hint no-print" style={{ color: '#64748b', fontSize: 13, margin: 0 }}>Seret gambar tanda tangan di pratinjau untuk memindahkan posisinya — posisi yang sama dipakai di PDF, DOCX, dan cetakan.</p>
               )}
               {errorMsg && <p className="msg err no-print">{errorMsg}</p>}

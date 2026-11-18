@@ -255,12 +255,13 @@ header.pagehead p { margin: 6px 0 0; color: var(--label-secondary); font-size: 1
 .letter-wrap { display: flex; flex-direction: column; gap: 16px; }
 .letter { position: relative; background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; padding: 48px 56px; font-family: 'Times New Roman', Times, serif; font-size: 15px; line-height: 1.55; color: #000; box-shadow: 0 4px 24px rgba(15, 23, 42, .08); }
 .letter-custom { font-size: 14px; }
-.custom-doc p { margin: 0 0 10px; text-align: justify; }
-/* Paragraf kosong di template DOCX = baris kosong: beri tinggi satu baris
-   supaya pratinjau (dan PDF-nya) sama persis dengan dokumen aslinya. */
-.custom-doc p:empty { min-height: 1.25em; }
-.custom-doc table { border-collapse: collapse; margin: 8px 0; }
-.custom-doc td, .custom-doc th { border: 1px solid #cbd5e1; padding: 4px 8px; }
+/* Pratinjau template kustom dirender docx-preview apa adanya dari DOCX:
+   kop, logo, font, dan halaman sama seperti di file. Halaman putih dengan
+   bayangan; wrapper transparan supaya tidak ada latar abu-abu di dalam surat. */
+.custom-doc { overflow-x: auto; }
+.custom-doc .docx-wrapper { background: transparent; padding: 0; }
+.custom-doc .docx-wrapper > .docx { margin: 0 auto 16px; box-shadow: 0 4px 24px rgba(15, 23, 42, .12); }
+.custom-doc .docx-wrapper > .docx:last-child { margin-bottom: 0; }
 .custom-doc img { max-width: 100%; height: auto; }
 @media (max-width: 640px) {
   header.pagehead { padding: 92px 16px 4px; }
