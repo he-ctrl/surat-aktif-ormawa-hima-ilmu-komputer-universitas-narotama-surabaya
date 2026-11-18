@@ -256,6 +256,9 @@ header.pagehead p { margin: 6px 0 0; color: var(--label-secondary); font-size: 1
 .letter { position: relative; background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; padding: 48px 56px; font-family: 'Times New Roman', Times, serif; font-size: 15px; line-height: 1.55; color: #000; box-shadow: 0 4px 24px rgba(15, 23, 42, .08); }
 .letter-custom { font-size: 14px; }
 .custom-doc p { margin: 0 0 10px; text-align: justify; }
+/* Paragraf kosong di template DOCX = baris kosong: beri tinggi satu baris
+   supaya pratinjau (dan PDF-nya) sama persis dengan dokumen aslinya. */
+.custom-doc p:empty { min-height: 1.25em; }
 .custom-doc table { border-collapse: collapse; margin: 8px 0; }
 .custom-doc td, .custom-doc th { border: 1px solid #cbd5e1; padding: 4px 8px; }
 .custom-doc img { max-width: 100%; height: auto; }
@@ -302,26 +305,27 @@ header.pagehead p { margin: 6px 0 0; color: var(--label-secondary); font-size: 1
 .idtable td.sep { width: 14px; }
 .sign { margin-top: 28px; text-align: right; }
 .sign .name { font-weight: 700; margin-top: 96px; }
-.sign-img { height: 96px; width: auto; margin: 8px 0 0; }
+.sign-img { display: block; height: 96px; width: auto; margin: 8px 0 0 auto; }
+/* Penahan ruang saat tanda tangan diseret (overlay): tinggi + margin sama
+   dengan gambar, supaya nama tidak naik dan tata letak tidak runtuh. */
+.sign-placeholder { height: 96px; margin: 8px 0 0; }
 .sign .sign-img + .name { margin-top: 4px; }
 .sign-overlay .name { margin-top: 4px; } /* overlay aktif: nama tidak bergeser saat gambar dilepas dari alur */
 .placeholder { color: #94a3b8; }
 
 /* Tanda tangan yang bisa diseret — selalu di atas pratinjau, posisi absolut
-   terhadap halaman surat (.letter). */
+   terhadap halaman surat (.letter). Kursor/outline seret hanya untuk
+   .sign-draggable (owner saja); tanpa kelas itu gambar tidak bisa diseret
+   dan sentuhan tetap menggulir halaman seperti biasa. */
 .sign-draggable { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
 .sign-drag {
   position: absolute;
   height: 96px;
   width: auto;
   z-index: 5;
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
 }
-.sign-drag:hover, .sign-draggable:hover { outline: 2px dashed rgba(29, 91, 251, 0.55); outline-offset: 4px; border-radius: 4px; }
-.sign-drag:active, .sign-draggable:active { cursor: grabbing; }
+.sign-draggable:hover { outline: 2px dashed rgba(29, 91, 251, 0.55); outline-offset: 4px; border-radius: 4px; }
+.sign-draggable:active { cursor: grabbing; }
 
 /* Pratinjau tanda tangan di Dasbor Owner — kertas putih supaya goresan
    gelap tetap terlihat jelas di mode gelap sekalipun. */

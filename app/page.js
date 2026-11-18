@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { BUILTIN_TEMPLATE, PRODI_OPTIONS, JABATAN_OPTIONS } from './lib/builtinTemplate.js';
-import { formatNomor, DEFAULT_NOMOR_FORMAT, NOMOR_PLACEHOLDERS } from './lib/nomorFormat.js';
+import { formatNomor, DEFAULT_NOMOR_FORMAT, NOMOR_PLACEHOLDERS, waktuValues } from './lib/nomorFormat.js';
 
 const BULAN_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
@@ -185,7 +185,10 @@ export default function Page() {
     const t = setTimeout(async () => {
       try {
         const { fillGenericDocx } = await import('./lib/fillGenericDocx.js');
-        const previewValues = { tanggal: tanggalTampil, nomor: nomorTampil };
+        // Nilai sistem: {tanggal}, {nomor}, plus {waktu.*} supaya placeholder
+        // waktu juga bisa ditulis langsung di isi template (bukan hanya di
+        // format nomor). Isian kosong ditampilkan sebagai '........' di pratinjau saja.
+        const previewValues = { tanggal: tanggalTampil, nomor: nomorTampil, ...waktuValues(now) };
         for (const p of selected.params || []) {
           const v = (values[p.name] || '').trim();
           previewValues[p.name] = v !== '' ? values[p.name] : '........';
@@ -194,7 +197,10 @@ export default function Page() {
           templateBytes: customBytes, values: previewValues, tandaTangan: 'basah', outputType: 'arraybuffer',
         });
         const mammoth = (await import('mammoth')).default;
+        // ignoreEmptyParagraphs: false — paragraf kosong di template DOCX
+        // harus tampil sebagai baris kosong di pratinjau (bukan hilang).
         const { value } = await mammoth.convertToHtml({ arrayBuffer: filled }, {
+          ignoreEmptyParagraphs: false,
           convertImage: mammoth.images.imgElement((image) =>
             image.read('base64').then((b64) => ({ src: `data:${image.contentType};base64,${b64}` }))),
         });
@@ -389,7 +395,7 @@ export default function Page() {
       const { fillGenericDocx } = await import('./lib/fillGenericDocx.js');
       const blob = await fillGenericDocx({
         templateBytes: customBytes,
-        values: { ...values, tanggal: tanggalTampil, nomor: nomorTampil },
+        values: { ...values, tanggal: tanggalTampil, nomor: nomorTampil, ...waktuValues(new Date()) },
         tandaTangan,
         signatureBytes,
         sigPos: sigPos || { ...DEFAULT_SIG_POS },
@@ -494,7 +500,10 @@ export default function Page() {
   // (ambang 6px). Ketukan biasa — misalnya jari menyentuh gambar saat
   // menggulir di HP — tidak boleh membalikkan tata letak: dalam mode overlay
   // nama naik ke posisi gambar dan gambar menimpa nama (terlihat "aneh").
+  // Seret tanda tangan HANYA untuk owner. Pengguna biasa tidak bisa
+  // memindahkan tanda tangan — posisinya tetap seperti yang owner atur.
   function startSigDrag(e) {
+    if (!owner) return;
     if (tandaTangan !== 'digital') return;
     e.preventDefault();
     const letter = letterRef.current;
@@ -792,10 +801,11 @@ export default function Page() {
               </div>
               <div className="field">
                 <label htmlFor="up-file">File DOCX (maks. 500 KB) *</label>
-                <input id="up-file" type="file" accept=".docx" ref={fileInputRef} required />
+                <input id="up-file" type="file" accept=".docx,.doc" ref={fileInputRef} required />
+                <p className="help">File .doc (Word lama) belum bisa dipakai langsung — buka di Word/WPS, lalu File → Save As → pilih “Word Document (*.docx)”, simpan, dan unggah file .docx-nya.</p>
               </div>
               <p className="help">
-                Tulis placeholder di dalam dokumen dengan format <code>{'{nama | string}'}</code>, <code>{'{prodi | dropdown | Sistem Komputer, Teknik Informatika}'}</code>, atau <code>{'{jabatan | radio | Sekretaris, Bendahara}'}</code>. <code>{'{tanggal}'}</code> dan <code>{'{nomor}'}</code> diisi otomatis. Ketik placeholder dalam sekali ketik — jangan diedit di tengah kata, supaya tidak terpotong.
+                Tulis placeholder di dalam dokumen dengan format <code>{'{nama | string}'}</code>, <code>{'{prodi | dropdown | Sistem Komputer, Teknik Informatika}'}</code>, atau <code>{'{jabatan | radio | Sekretaris, Bendahara}'}</code>. <code>{'{tanggal}'}</code> dan <code>{'{nomor}'}</code> diisi otomatis. Placeholder waktu <code>{'{waktu.tanggal}'}</code>, <code>{'{waktu.bulan}'}</code>, <code>{'{waktu.tahun}'}</code>, dan <code>{'{waktu.bulan.romawi}'}</code> juga bisa ditulis langsung di isi dokumen. Ketik placeholder dalam sekali ketik — jangan diedit di tengah kata, supaya tidak terpotong.
               </p>
               {uploadError && <p className="msg err">{uploadError}</p>}
               <button className="btn btn-primary" type="submit" disabled={uploadBusy}>{uploadBusy ? 'Mengunggah…' : 'Unggah Template'}</button>
@@ -944,7 +954,7 @@ export default function Page() {
                   <div className="radio-group" role="radiogroup" aria-label="Tanda tangan">
                     <label className="radio">
                       <input type="radio" name="tandaTangan" value="digital" checked={tandaTangan === 'digital'} onChange={() => setTandaTangan('digital')} />
-                      <span><b>Tanda tangan digital</b><br />Tanda tangan yang bersangkutan (Ketua HIMA ILKOM) ditempel di surat. Seret gambarnya di pratinjau untuk memindahkan posisinya.</span>
+                      <span><b>Tanda tangan digital</b><br />Tanda tangan yang bersangkutan (Ketua HIMA ILKOM) ditempel di surat.{owner ? ' Seret gambarnya di pratinjau untuk memindahkan posisinya.' : ''}</span>
                     </label>
                     <label className="radio">
                       <input type="radio" name="tandaTangan" value="basah" checked={tandaTangan === 'basah'} onChange={() => setTandaTangan('basah')} />
@@ -959,7 +969,7 @@ export default function Page() {
                       {namaValue.trim() === '' && (<div className="help">Isi nama di atas dulu untuk mengirim.</div>)}
                     </div>
                   )}
-                  {tandaTangan === 'digital' && (sigDragged || sigMode === 'overlay') && (
+                  {tandaTangan === 'digital' && owner && (sigDragged || sigMode === 'overlay') && (
                     <div className="wa-row">
                       <button type="button" className="btn-ghost" onClick={resetSigPos}>Kembalikan posisi tanda tangan</button>
                     </div>
@@ -1039,14 +1049,20 @@ export default function Page() {
                     <div>Ketua HIMA ILKOM</div>
                     <div>Universitas Narotama Surabaya</div>
                     {tandaTangan === 'digital' && sigMode === 'inline' && (
-                      <img ref={sigImgRef} className="sign-img sign-draggable" src={sigUrl} alt="Tanda tangan Hendryk Damastra — seret untuk memindahkan" onPointerDown={startSigDrag} draggable={false} />
+                      <img ref={sigImgRef} className={owner ? 'sign-img sign-draggable' : 'sign-img'} src={sigUrl} alt={owner ? 'Tanda tangan Hendryk Damastra — seret untuk memindahkan' : 'Tanda tangan Hendryk Damastra'} onPointerDown={owner ? startSigDrag : undefined} draggable={false} />
+                    )}
+                    {tandaTangan === 'digital' && sigMode === 'overlay' && (
+                      // Penahan ruang: saat tanda tangan jadi overlay (diseret),
+                      // nama tidak boleh naik ke posisi gambar — tata letak surat
+                      // tetap seperti sebelum diseret.
+                      <div className="sign-placeholder" aria-hidden="true" />
                     )}
                     <div className="name">Hendryk Damastra</div>
                     <div>NIM : 04123008</div>
                   </div>
 
                   {tandaTangan === 'digital' && sigMode === 'overlay' && sigPos && (
-                    <img className="sign-drag" style={{ left: `${sigPos.x}%`, top: `${sigPos.y}%` }} src={sigUrl} alt="Tanda tangan Hendryk Damastra — seret untuk memindahkan" onPointerDown={startSigDrag} draggable={false} />
+                    <img className={owner ? 'sign-drag sign-draggable' : 'sign-drag'} style={{ left: `${sigPos.x}%`, top: `${sigPos.y}%` }} src={sigUrl} alt={owner ? 'Tanda tangan Hendryk Damastra — seret untuk memindahkan' : 'Tanda tangan Hendryk Damastra'} onPointerDown={owner ? startSigDrag : undefined} draggable={false} />
                   )}
                 </div>
               ) : (
@@ -1060,7 +1076,7 @@ export default function Page() {
                     <p className="hint">Pratinjau template akan muncul di sini.</p>
                   )}
                   {tandaTangan === 'digital' && sigPos && (
-                    <img className="sign-drag" style={{ left: `${sigPos.x}%`, top: `${sigPos.y}%` }} src={sigUrl} alt="Tanda tangan Hendryk Damastra — seret untuk memindahkan" onPointerDown={startSigDrag} draggable={false} />
+                    <img className={owner ? 'sign-drag sign-draggable' : 'sign-drag'} style={{ left: `${sigPos.x}%`, top: `${sigPos.y}%` }} src={sigUrl} alt={owner ? 'Tanda tangan Hendryk Damastra — seret untuk memindahkan' : 'Tanda tangan Hendryk Damastra'} onPointerDown={owner ? startSigDrag : undefined} draggable={false} />
                   )}
                 </div>
               )}
@@ -1070,7 +1086,7 @@ export default function Page() {
                 <button className="btn btn-outline" type="button" onClick={handlePdf} disabled={!submitted || busy !== ''}>{busy === 'pdf' ? 'Membuat PDF…' : 'Unduh PDF'}</button>
                 <button className="btn btn-outline" type="button" onClick={handleDocx} disabled={!submitted || busy !== ''}>{busy === 'docx' ? 'Membuat DOCX…' : 'Unduh DOCX'}</button>
               </div>
-              {tandaTangan === 'digital' && (
+              {tandaTangan === 'digital' && owner && (
                 <p className="hint no-print" style={{ color: '#64748b', fontSize: 13, margin: 0 }}>Seret gambar tanda tangan di pratinjau untuk memindahkan posisinya — posisi yang sama dipakai di PDF, DOCX, dan cetakan.</p>
               )}
               {errorMsg && <p className="msg err no-print">{errorMsg}</p>}
