@@ -301,8 +301,8 @@ header.pagehead p { margin: 6px 0 0; color: var(--label-secondary); font-size: 1
 .idtable td.lbl { width: 110px; }
 .idtable td.sep { width: 14px; }
 .sign { margin-top: 28px; text-align: right; }
-.sign .name { font-weight: 700; margin-top: 64px; }
-.sign-img { height: 64px; width: auto; margin: 8px 0 0; }
+.sign .name { font-weight: 700; margin-top: 96px; }
+.sign-img { height: 96px; width: auto; margin: 8px 0 0; }
 .sign .sign-img + .name { margin-top: 4px; }
 .sign-overlay .name { margin-top: 4px; } /* overlay aktif: nama tidak bergeser saat gambar dilepas dari alur */
 .placeholder { color: #94a3b8; }
@@ -312,7 +312,7 @@ header.pagehead p { margin: 6px 0 0; color: var(--label-secondary); font-size: 1
 .sign-draggable { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
 .sign-drag {
   position: absolute;
-  height: 64px;
+  height: 96px;
   width: auto;
   z-index: 5;
   cursor: grab;
@@ -322,6 +322,11 @@ header.pagehead p { margin: 6px 0 0; color: var(--label-secondary); font-size: 1
 }
 .sign-drag:hover, .sign-draggable:hover { outline: 2px dashed rgba(29, 91, 251, 0.55); outline-offset: 4px; border-radius: 4px; }
 .sign-drag:active, .sign-draggable:active { cursor: grabbing; }
+
+/* Pratinjau tanda tangan di Dasbor Owner — kertas putih supaya goresan
+   gelap tetap terlihat jelas di mode gelap sekalipun. */
+.sig-preview { background: #fff; border: 1px solid var(--separator); border-radius: 12px; padding: 12px 16px; margin: 4px 0 12px; max-width: 340px; }
+.sig-preview img { display: block; height: 96px; width: auto; max-width: 100%; margin-left: auto; }
 
 .saran-wrap { position: relative; }
 .saran-list { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20; margin: 0; padding: 4px; list-style: none; background: var(--card); border: 1px solid var(--separator-strong); border-radius: 10px; box-shadow: var(--shadow-pop); max-height: 240px; overflow: auto; }

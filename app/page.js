@@ -8,22 +8,26 @@ const BULAN_ROMAWI = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X
 
 const PENANDATANGAN = { nama: 'Hendryk Damastra', nim: '04123008', jabatan: 'Ketua', organisasi: 'Himpunan Mahasiswa Ilmu Komputer' };
 
-const PATH_PREFIX = '/surat-aktif-ormawa-hima-ilmu-komputer-universitas-narotama-surabaya';
+// Halaman bisa disajikan di tiga tempat: root domain vercel.app (tanpa prefix),
+// subpath panjang di hendrykdamastra.my.id, atau alias pendek /surat di domain
+// yang sama. Aset dan panggilan API memakai prefix yang sama dengan halaman,
+// supaya tetap jalan di ketiganya (hanya path itu yang di-rewrite ke aplikasi
+// surat; /api/... di root domain justru mengenai situs personal → 404 HTML).
+const PATH_PREFIXES = ['/surat-aktif-ormawa-hima-ilmu-komputer-universitas-narotama-surabaya', '/surat'];
 const ASSET_BASE = 'https://surat-aktif-ormawa-hima-ilmu-komput.vercel.app';
-// Aset di public/ diambil lewat path yang sama dengan halaman, supaya tetap
-// jalan baik di domain vercel.app maupun lewat rewrite hendrykdamastra.my.id.
-function assetPath(p) {
-  if (typeof window !== 'undefined' && window.location.pathname.startsWith(PATH_PREFIX)) return PATH_PREFIX + p;
-  return p;
+function basePrefix() {
+  if (typeof window === 'undefined') return '';
+  const p = window.location.pathname;
+  for (const pre of PATH_PREFIXES) if (p === pre || p.startsWith(pre + '/')) return pre;
+  return '';
 }
-
-// Panggilan API memakai prefix yang sama: di hendrykdamastra.my.id halaman
-// disajikan di bawah PATH_PREFIX dan hanya path itu yang di-rewrite ke aplikasi
-// surat — /api/... di root domain justru mengenai situs personal (404 HTML),
-// sehingga login (dan semua API lain) gagal di domain kustom.
+function assetPath(p) {
+  const pre = basePrefix();
+  return pre ? pre + p : p;
+}
 function apiPath(p) {
-  if (typeof window !== 'undefined' && window.location.pathname.startsWith(PATH_PREFIX)) return PATH_PREFIX + p;
-  return p;
+  const pre = basePrefix();
+  return pre ? pre + p : p;
 }
 
 async function fetchLogoRun(path, ImageRun) {
@@ -95,14 +99,20 @@ export default function Page() {
   const [pwCurrent, setPwCurrent] = useState('');
   const [pwNew, setPwNew] = useState('');
   const [pwMsg, setPwMsg] = useState('');
+  const [sigVersion, setSigVersion] = useState(0); // pengubah cache URL tanda tangan
+  const [sigBusy, setSigBusy] = useState(false);
+  const [sigMsg, setSigMsg] = useState('');
+  const [sigError, setSigError] = useState('');
 
   const letterRef = useRef(null);
   const sigImgRef = useRef(null);
   const fileInputRef = useRef(null);
+  const sigFileRef = useRef(null);
   const bytesCache = useRef(new Map());
 
   const selected = templates.find((t) => t.id === selectedId) || templates[0] || null;
   const isCustom = selected?.kind === 'custom';
+  const sigUrl = `${apiPath('/api/signature')}?v=${sigVersion}`;
 
   async function refreshTemplates(selectId) {
     try {
@@ -269,7 +279,7 @@ export default function Page() {
 
   async function fetchSignatureBytes() {
     try {
-      const sigRes = await fetch(assetPath('/tanda-tangan-hendryk.png'));
+      const sigRes = await fetch(apiPath('/api/signature'), { cache: 'no-store' });
       if (sigRes.ok) return await sigRes.arrayBuffer();
     } catch { /* tanpa tanda tangan bila PNG gagal dimuat */ }
     return null;
@@ -603,6 +613,44 @@ export default function Page() {
     }
   }
 
+  async function handleSigUpload(e) {
+    e.preventDefault();
+    setSigMsg('');
+    setSigError('');
+    const file = sigFileRef.current?.files?.[0];
+    if (!file) { setSigError('Pilih file PNG tanda tangan dulu.'); return; }
+    setSigBusy(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch(apiPath('/api/signature'), { method: 'POST', body: form });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Unggah gagal.');
+      setSigVersion((v) => v + 1);
+      setSigMsg(`Tanda tangan baru berhasil diunggah (${Math.round(d.bytes / 1024)} KB) dan langsung dipakai di pratinjau, PDF, dan DOCX.`);
+      if (sigFileRef.current) sigFileRef.current.value = '';
+    } catch (err) {
+      setSigError(err?.message || 'Unggah tanda tangan gagal.');
+    } finally {
+      setSigBusy(false);
+    }
+  }
+
+  async function handleSigReset() {
+    if (!window.confirm('Kembalikan ke tanda tangan bawaan?')) return;
+    setSigMsg('');
+    setSigError('');
+    try {
+      const res = await fetch(apiPath('/api/signature'), { method: 'DELETE' });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Gagal.');
+      setSigVersion((v) => v + 1);
+      setSigMsg('Tanda tangan dikembalikan ke bawaan.');
+    } catch (err) {
+      setSigError(err?.message || 'Gagal mengembalikan tanda tangan.');
+    }
+  }
+
   async function handleChangePassword(e) {
     e.preventDefault();
     setPwMsg('');
@@ -670,7 +718,7 @@ export default function Page() {
         {owner && (
           <section className="panel owner-panel">
             <h2>Dasbor Owner</h2>
-            <p className="hint">Kamu login sebagai <b>{owner.username}</b>. Di sini kamu bisa mengunggah template surat baru (file DOCX), menghapus template kustom, dan memilih template utama.</p>
+            <p className="hint">Kamu login sebagai <b>{owner.username}</b>. Di sini kamu bisa mengunggah template surat baru (file DOCX), menghapus template kustom, memilih template utama, serta mengganti gambar tanda tangan.</p>
             {mustChange && <p className="msg warn">Kamu masih memakai password default. Ubah password di bawah ini.</p>}
 
             <h3>Template surat</h3>
@@ -723,6 +771,26 @@ export default function Page() {
                 )}
               </div>
             )}
+
+            <h3>Tanda tangan</h3>
+            <p className="hint">Tanda tangan di bawah ini yang ditempel di pratinjau, PDF, dan DOCX saat memilih tanda tangan digital.</p>
+            <div className="sig-preview">
+              <img src={sigUrl} alt="Tanda tangan saat ini" />
+            </div>
+            <form onSubmit={handleSigUpload}>
+              <div className="field">
+                <label htmlFor="sig-file">Unggah tanda tangan baru (PNG, maks. 500 KB) *</label>
+                <input id="sig-file" type="file" accept="image/png,.png" ref={sigFileRef} required />
+              </div>
+              <p className="help">
+                Gunakan PNG transparan agar tidak ada kotak putih di surat. Tanda tangan baru langsung dipakai di semua surat setelah diunggah.
+              </p>
+              {sigError && <p className="msg err">{sigError}</p>}
+              {sigMsg && <p className="msg">{sigMsg}</p>}
+              <button className="btn btn-primary" type="submit" disabled={sigBusy}>{sigBusy ? 'Mengunggah…' : 'Unggah Tanda Tangan'}</button>
+              {' '}
+              <button className="btn btn-outline" type="button" onClick={handleSigReset}>Kembalikan ke bawaan</button>
+            </form>
 
             <h3>Ubah password owner</h3>
             <form onSubmit={handleChangePassword}>
@@ -914,14 +982,14 @@ export default function Page() {
                     <div>Ketua HIMA ILKOM</div>
                     <div>Universitas Narotama Surabaya</div>
                     {tandaTangan === 'digital' && sigMode === 'inline' && (
-                      <img ref={sigImgRef} className="sign-img sign-draggable" src={`${ASSET_BASE}/tanda-tangan-hendryk.png`} alt="Tanda tangan Hendryk Damastra — seret untuk memindahkan" onPointerDown={startSigDrag} draggable={false} />
+                      <img ref={sigImgRef} className="sign-img sign-draggable" src={sigUrl} alt="Tanda tangan Hendryk Damastra — seret untuk memindahkan" onPointerDown={startSigDrag} draggable={false} />
                     )}
                     <div className="name">Hendryk Damastra</div>
                     <div>NIM : 04123008</div>
                   </div>
 
                   {tandaTangan === 'digital' && sigMode === 'overlay' && sigPos && (
-                    <img className="sign-drag" style={{ left: `${sigPos.x}%`, top: `${sigPos.y}%` }} src={`${ASSET_BASE}/tanda-tangan-hendryk.png`} alt="Tanda tangan Hendryk Damastra — seret untuk memindahkan" onPointerDown={startSigDrag} draggable={false} />
+                    <img className="sign-drag" style={{ left: `${sigPos.x}%`, top: `${sigPos.y}%` }} src={sigUrl} alt="Tanda tangan Hendryk Damastra — seret untuk memindahkan" onPointerDown={startSigDrag} draggable={false} />
                   )}
                 </div>
               ) : (
@@ -935,7 +1003,7 @@ export default function Page() {
                     <p className="hint">Pratinjau template akan muncul di sini.</p>
                   )}
                   {tandaTangan === 'digital' && sigPos && (
-                    <img className="sign-drag" style={{ left: `${sigPos.x}%`, top: `${sigPos.y}%` }} src={`${ASSET_BASE}/tanda-tangan-hendryk.png`} alt="Tanda tangan Hendryk Damastra — seret untuk memindahkan" onPointerDown={startSigDrag} draggable={false} />
+                    <img className="sign-drag" style={{ left: `${sigPos.x}%`, top: `${sigPos.y}%` }} src={sigUrl} alt="Tanda tangan Hendryk Damastra — seret untuk memindahkan" onPointerDown={startSigDrag} draggable={false} />
                   )}
                 </div>
               )}
