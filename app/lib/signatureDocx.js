@@ -3,7 +3,7 @@
 //  - inline: gambar di dalam alur paragraf (perilaku lama template bawaan).
 //  - anchor: gambar mengambang pada posisi absolut halaman (posisi hasil
 //    drag & drop di pratinjau, dalam persen terhadap halaman A4).
-// Dimensi: tinggi 58pt (sama seperti sebelumnya), lebar ikut rasio PNG.
+// Dimensi: tinggi 80pt, lebar ikut rasio PNG.
 
 const A4_W_EMU = 7559970; // 210mm
 const A4_H_EMU = 10691988; // 297mm
@@ -18,7 +18,7 @@ export function pngDimensions(png) {
 export async function addSignatureImage(zip, signatureBytes) {
   const png = new Uint8Array(signatureBytes);
   const { w: pngW, h: pngH } = pngDimensions(png);
-  const H_PT = 58;
+  const H_PT = 80;
   const W_PT = H_PT * (pngW / pngH);
   const cx = Math.round(W_PT * 12700);
   const cy = Math.round(H_PT * 12700);

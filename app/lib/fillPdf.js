@@ -101,7 +101,7 @@ export async function fillSuratPdf({ templateBytes, nama, nim, prodi, jabatan, t
   if (tandaTangan === 'digital' && signatureBytes) {
     try {
       const sig = await out.embedPng(signatureBytes);
-      const SIG_H = 58; // tinggi gambar (pt template)
+      const SIG_H = 64; // tinggi gambar (pt template) — ruang maks. s.d. nama
       const SIG_W = SIG_H * (sig.width / sig.height);
       if (sigPos) {
         const w = SIG_W * S;
@@ -110,7 +110,7 @@ export async function fillSuratPdf({ templateBytes, nama, nim, prodi, jabatan, t
         const yTop = (Math.min(96, Math.max(0, sigPos.y)) / 100) * A4_H;
         page.drawImage(sig, { x, y: A4_H - yTop - h, width: w, height: h });
       } else {
-        const SIG_TOP = 594; // tepi atas gambar (koordinat dari-atas template)
+        const SIG_TOP = 590; // tepi atas gambar (koordinat dari-atas template)
         page.drawImage(sig, {
           x: X(540 - SIG_W),
           y: Y(SIG_TOP + SIG_H),

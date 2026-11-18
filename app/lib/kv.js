@@ -1,7 +1,7 @@
 // Helper server-side untuk Upstash KV (store yang sama dengan Kronos dan
 // LogiTrack) + akun owner dan sesi login.
 // Kunci: surat-aktif:templates, surat-aktif:template-file:<id>,
-// surat-aktif:users, surat-aktif:sessions.
+// surat-aktif:users, surat-aktif:sessions, surat-aktif:signature (base64 PNG).
 // Catatan Upstash: POST /set/<key> menyimpan body APA ADANYA — jadi nilai
 // JSON dikirim sebagai string JSON mentah, dan base64 sebagai string mentah.
 
@@ -11,6 +11,7 @@ const KV_URL = (process.env.KV_REST_API_URL || '').replace(/\/$/, '');
 const KV_TOKEN = process.env.KV_REST_API_TOKEN || '';
 
 export const TEMPLATES_KEY = 'surat-aktif:templates';
+export const SIGNATURE_KEY = 'surat-aktif:signature';
 export const USERS_KEY = 'surat-aktif:users';
 export const SESSIONS_KEY = 'surat-aktif:sessions';
 export const SESSION_COOKIE = 'surat_owner_session';
